@@ -18,7 +18,7 @@ interface DashboardProps {
   groupCode: string;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ language, groupCode }) => {
+const Dashboard: React.FC<DashboardProps> = ({ language, groupCode }) => {
   const texts = {
     en: {
       welcome: 'Welcome to Simhasth Saathi',
@@ -201,3 +201,5 @@ export const Dashboard: React.FC<DashboardProps> = ({ language, groupCode }) => 
     </div>
   );
 };
+
+export default Dashboard;

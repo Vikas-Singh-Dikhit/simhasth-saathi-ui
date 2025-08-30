@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Onboarding } from '@/components/onboarding';
 import { Login } from '@/components/login';
 import { GroupSetup } from '@/components/group-setup';
-import { Dashboard } from '@/pages/Dashboard';
+import Dashboard from '@/pages/Dashboard';
 
 type AppStep = 'onboarding' | 'login' | 'group-setup' | 'dashboard';
 
