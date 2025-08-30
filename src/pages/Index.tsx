@@ -1,14 +1,46 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import React, { useState } from 'react';
+import { Onboarding } from '@/components/onboarding';
+import { Login } from '@/components/login';
+import { GroupSetup } from '@/components/group-setup';
+import { Dashboard } from '@/pages/Dashboard';
+
+type AppStep = 'onboarding' | 'login' | 'group-setup' | 'dashboard';
 
 const Index = () => {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
-    </div>
-  );
+  const [currentStep, setCurrentStep] = useState<AppStep>('onboarding');
+  const [language, setLanguage] = useState('en');
+  const [groupCode, setGroupCode] = useState('');
+
+  const handleLanguageComplete = (selectedLanguage: string) => {
+    setLanguage(selectedLanguage);
+    setCurrentStep('login');
+  };
+
+  const handleLoginSuccess = () => {
+    setCurrentStep('group-setup');
+  };
+
+  const handleGroupCreated = (code: string) => {
+    setGroupCode(code);
+    setCurrentStep('dashboard');
+  };
+
+  switch (currentStep) {
+    case 'onboarding':
+      return <Onboarding onComplete={handleLanguageComplete} />;
+    
+    case 'login':
+      return <Login onLoginSuccess={handleLoginSuccess} language={language} />;
+    
+    case 'group-setup':
+      return <GroupSetup onGroupCreated={handleGroupCreated} language={language} />;
+    
+    case 'dashboard':
+      return <Dashboard language={language} groupCode={groupCode} />;
+    
+    default:
+      return null;
+  }
 };
 
 export default Index;
