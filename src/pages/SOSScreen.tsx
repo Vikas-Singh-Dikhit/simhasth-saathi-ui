@@ -1,30 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { AlertTriangle, Phone, Shield, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useTranslation } from '@/context/TranslationContext';
-
-interface SOSAlert {
-  id: string;
-  time: string;
-  status: 'sent' | 'responded' | 'resolved';
-  responder?: string;
-}
+import { useAppStore } from '@/store/appStore';
 
 const SOSScreen = () => {
   const { t } = useTranslation();
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isEmergency, setIsEmergency] = useState(false);
-
-  const recentAlerts: SOSAlert[] = [
-    { id: '1', time: '2 घंटे पहले', status: 'resolved', responder: 'स्वयंसेवक राहुल' },
-    { id: '2', time: '1 दिन पहले', status: 'responded', responder: 'पुलिस टीम A' },
-  ];
+  const triggerSOS = useAppStore(s => s.triggerSOS);
+  const sosAlerts = useAppStore(s => s.sosAlerts);
 
   const handleSOSPress = () => {
     setIsEmergency(true);
     setShowConfirmation(true);
+    triggerSOS();
     setTimeout(() => setIsEmergency(false), 3000);
   };
 
@@ -90,7 +82,7 @@ const SOSScreen = () => {
       </div>
 
       {/* Recent Alerts */}
-      {recentAlerts.length > 0 && (
+      {sosAlerts.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
@@ -99,11 +91,11 @@ const SOSScreen = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {recentAlerts.map((alert) => (
+            {sosAlerts.map((alert) => (
               <div key={alert.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                 <div>
                   <p className="font-medium text-sm">{t('sosAlert')}</p>
-                  <p className="text-xs text-muted-foreground">{alert.time}</p>
+                  <p className="text-xs text-muted-foreground">{new Date(alert.createdAt).toLocaleString()}</p>
                 </div>
                 <div className="text-right">
                   <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
@@ -128,4 +120,4 @@ const SOSScreen = () => {
   );
 };
 
-export default SOSScreen;
+export default memo(SOSScreen);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, memo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StatusIndicator } from '@/components/ui/status-indicator';
@@ -11,6 +11,7 @@ import {
   Navigation
 } from 'lucide-react';
 import { useTranslation } from '@/context/TranslationContext';
+import { useNavigate } from 'react-router-dom';
 
 interface DashboardProps {
   groupCode: string;
@@ -18,12 +19,12 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ groupCode }) => {
   const { t } = useTranslation();
-
-  const mockGroupMembers = [
+  const navigate = useNavigate();
+  const mockGroupMembers = useMemo(() => ([
     { name: 'राम शर्मा', status: 'safe', lastSeen: '2 min ago' },
     { name: 'सीता देवी', status: 'safe', lastSeen: '5 min ago' },
     { name: 'लक्ष्मण कुमार', status: 'safe', lastSeen: '1 min ago' },
-  ];
+  ]), []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-saffron-light/30 via-background to-sky-blue-light/30">
@@ -45,8 +46,8 @@ const Dashboard: React.FC<DashboardProps> = ({ groupCode }) => {
               </div>
 
               <div className="space-y-2">
-                {mockGroupMembers.map((member, idx) => (
-                  <div key={idx} className="flex items-center justify-between">
+                {mockGroupMembers.map((member) => (
+                  <div key={member.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="h-2 w-2 bg-success rounded-full"></div>
                       <span className="text-sm text-foreground">{member.name}</span>
@@ -72,6 +73,7 @@ const Dashboard: React.FC<DashboardProps> = ({ groupCode }) => {
               variant="destructive"
               size="lg"
               className="h-20 flex-col gap-2 bg-danger hover:bg-danger/90 text-white shadow-medium"
+              onClick={() => navigate('/sos')}
             >
               <AlertTriangle className="h-6 w-6" />
               <span className="text-sm font-medium">SOS</span>
@@ -81,6 +83,7 @@ const Dashboard: React.FC<DashboardProps> = ({ groupCode }) => {
               variant="secondary"
               size="lg"
               className="h-20 flex-col gap-2 bg-secondary hover:bg-secondary/90 shadow-medium"
+              onClick={() => navigate('/map')}   
             >
               <MapPin className="h-6 w-6" />
               <span className="text-sm font-medium">{t('findGroup')}</span>
@@ -140,4 +143,4 @@ const Dashboard: React.FC<DashboardProps> = ({ groupCode }) => {
   );
 };
 
-export default Dashboard;
+export default memo(Dashboard);

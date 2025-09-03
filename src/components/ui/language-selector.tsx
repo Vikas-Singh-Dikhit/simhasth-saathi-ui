@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { LanguageCode } from '@/context/TranslationContext';
 
 interface Language {
-  code: 'en' | 'hi' | 'mr' | 'sa';
+  code: 'en' | 'hi';
   name: string;
   nativeName: string;
 }
@@ -12,8 +12,6 @@ interface Language {
 const languages: Language[] = [
   { code: 'en', name: 'English', nativeName: 'English' },
   { code: 'hi', name: 'Hindi', nativeName: 'हिंदी' },
-  { code: 'mr', name: 'Marathi', nativeName: 'मराठी' },
-  { code: 'sa', name: 'Sanskrit', nativeName: 'संस्कृत' },
 ];
 
 interface LanguageSelectorProps {
@@ -42,7 +40,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
               : "bg-card border-card-border hover:border-primary/50 hover:bg-accent"
           )}
         >
-          <span className="font-medium text-sm">{language.name}</span>
+          {/* <span className="font-medium text-sm">{language.name}</span> */}
           <span className="text-lg font-devanagari">{language.nativeName}</span>
         </Button>
       ))}

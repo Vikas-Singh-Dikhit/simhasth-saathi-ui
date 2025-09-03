@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Users, Plus, UserPlus, Copy, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useGroup } from '@/context/GroupContext';
 
 interface GroupSetupProps {
   onGroupCreated: (groupCode: string) => void;
@@ -16,6 +17,7 @@ export const GroupSetup: React.FC<GroupSetupProps> = ({ onGroupCreated, language
   const [generatedCode, setGeneratedCode] = useState('');
   const [copied, setCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { createGroup, joinGroup } = useGroup();
 
   const texts = {
   en: {
@@ -117,9 +119,8 @@ export const GroupSetup: React.FC<GroupSetupProps> = ({ onGroupCreated, language
     setIsLoading(true);
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000));
-    localStorage.setItem('groupEnabled', 'true');
+    joinGroup(groupCode);
     onGroupCreated(groupCode);
-    localStorage.setItem('groupEnabled','true')
   };
 
   const handleCopyCode = async () => {
@@ -129,8 +130,8 @@ export const GroupSetup: React.FC<GroupSetupProps> = ({ onGroupCreated, language
   };
 
   const handleContinueWithCode = () => {
+    createGroup(generatedCode);
     onGroupCreated(generatedCode);
-    localStorage.setItem('groupEnabled','true')
     console.info("group created")
   };
 

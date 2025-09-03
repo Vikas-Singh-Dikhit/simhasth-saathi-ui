@@ -36,12 +36,12 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
           </div>
           
           <div className="space-y-2">
-            <h1 className="text-3xl-mobile font-bold text-foreground font-devanagari">
+            <h1 className="text-3xl-mobile font-bold text-foreground text-saffron-dark">
               {t('welcomeTitle')}
             </h1>
-            <h2 className="text-2xl-mobile font-bold text-saffron-dark">
+            {/* <h2 className="text-2xl-mobile font-bold text-saffron-dark">
               {t('welcomeTitle')}
-            </h2>
+            </h2> */}
             <p className="text-muted-foreground text-lg leading-relaxed">
               {t('welcomeSubtitle')}
             </p>

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { User, Users, Phone, MapPin, Settings, Share, Edit, Copy } from 'lucide-react';
+import React, { useState, useMemo, useCallback, memo } from 'react';
+import { User, Users, Phone, MapPin, Settings, Share, Edit, Copy, QrCode, Camera, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -8,13 +8,22 @@ import { Label } from '@/components/ui/label';
 import { StatusIndicator } from '@/components/ui/status-indicator';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '@/context/TranslationContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { toast } from 'sonner';
+import { useAppStore } from '@/store/appStore';
 
 const ProfileScreen = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [shareLocation, setShareLocation] = useState(true);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scanned, setScanned] = useState<null | { id: string; name: string; phone: string; groupCode: string }>(null);
+  const members = useAppStore(s => s.members);
+  const addMember = useAppStore(s => s.addMember);
+  const removeMemberFromStore = useAppStore(s => s.removeMember);
+  const clearMembers = useAppStore(s => s.clearMembers);
 
-  const userProfile = {
+  const userProfile = useMemo(() => ({
     name: 'राम प्रकाश शर्मा',
     age: 68,
     groupId: 'GRP-2024-001',
@@ -23,18 +32,53 @@ const ProfileScreen = () => {
       { name: 'अजय शर्मा (बेटा)', phone: '+91 98765 43211', relation: 'पुत्र' },
       { name: 'प्रिया शर्मा (बहू)', phone: '+91 98765 43212', relation: 'पुत्रवधू' }
     ]
-  };
+  }), []);
 
-  const handleShareLocation = () => {
+  const mockMembers = useMemo(() => ([
+    { id: 'MEM001', name: 'Ravi Sharma', phone: '+91 90000 00001', groupCode: 'GRP-2024-001' },
+    { id: 'MEM002', name: 'Sita Devi', phone: '+91 90000 00002', groupCode: 'GRP-2024-001' },
+    { id: 'MEM003', name: 'Mohan Lal', phone: '+91 90000 00003', groupCode: 'GRP-2024-001' },
+    { id: 'MEM004', name: 'Radha', phone: '+91 90000 00004', groupCode: 'GRP-2024-001' },
+  ]), []);
+
+  // Members now come from global store; persistence handled by store
+
+  const handleShareLocation = useCallback(() => {
     const message = `${t('locationMessage')} - ${userProfile.name}`;
     console.log('Sharing location via SMS:', message);
+  }, [t, userProfile.name]);
+
+  const copyGroupId = useCallback(() => {
+    navigator.clipboard.writeText(userProfile.groupId);
+  }, [userProfile.groupId]);
+
+  const simulateScan = () => {
+    const pick = mockMembers[Math.floor(Math.random() * mockMembers.length)];
+    setScanned(pick);
   };
 
-  const copyGroupId = () => {
-    navigator.clipboard.writeText(userProfile.groupId);
+  const addScannedMember = () => {
+    if (!scanned) return;
+    const exists = members.some(m => m.id === scanned.id || (m.phone && scanned.phone && m.phone === scanned.phone));
+    if (exists) {
+      toast('Member already added');
+      return;
+    }
+    addMember({ id: scanned.id, name: scanned.name, phone: scanned.phone, groupCode: scanned.groupCode });
+    toast.success('Member added');
+  };
+
+  const removeMember = (id: string) => {
+    removeMemberFromStore(id);
+  };
+
+  const clearAllMembers = () => {
+    clearMembers();
+    toast('All members cleared');
   };
 
   return (
+    <>
     <div className="min-h-screen bg-background pb-20">
       <div className="p-4 space-y-6">
         {/* User Info Card */}
@@ -72,6 +116,13 @@ const ProfileScreen = () => {
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
+            </div>
+
+            <div className="pt-2">
+              <Button onClick={() => setScannerOpen(true)} className="w-full sm:w-auto">
+                <QrCode className="h-4 w-4 mr-2" />
+                Add Member
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -148,7 +199,7 @@ const ProfileScreen = () => {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span>{t('totalMembers')}</span>
-                <span className="font-semibold">3</span>
+                <span className="font-semibold">{members.length}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span>{t('onlineMembers')}</span>
@@ -166,6 +217,35 @@ const ProfileScreen = () => {
             </Button>
           </CardContent>
         </Card>
+
+        {members.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Group Members</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-end">
+                <Button variant="outline" size="sm" onClick={clearAllMembers}>Clear All Members</Button>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                {members.map((m) => (
+                  <Card key={m.id} className="transition hover:shadow-medium">
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">{m.name}</div>
+                        <div className="text-sm text-muted-foreground">{m.phone}</div>
+                        <div className="text-xs">Group: {m.groupCode}</div>
+                      </div>
+                      <Button variant="destructive" size="sm" onClick={() => removeMember(m.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Settings Link */}
         <Button
@@ -194,8 +274,45 @@ const ProfileScreen = () => {
           {t('logout')}
         </Button>
       </div>
+    <Dialog open={scannerOpen} onOpenChange={setScannerOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Scan Member QR</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="mx-auto w-64 h-64 bg-muted rounded-lg flex items-center justify-center border-2 border-dashed border-primary">
+            <div className="text-center">
+              <Camera className="h-16 w-16 text-primary mx-auto mb-4" />
+              <p className="text-primary font-medium">Camera ready</p>
+              <p className="text-sm text-muted-foreground mt-1">Place QR inside the frame</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Button onClick={simulateScan}>Scan</Button>
+            <Button variant="outline" onClick={() => { setScannerOpen(false); setScanned(null); }}>Close</Button>
+          </div>
+
+          {scanned && (
+            <Card>
+              <CardContent className="p-4 space-y-1">
+                <div className="font-medium">{scanned.name}</div>
+                <div className="text-sm text-muted-foreground">{scanned.phone}</div>
+                <div className="text-xs">Group: {scanned.groupCode}</div>
+                <div className="pt-2 flex gap-2">
+                  <Button size="sm" onClick={addScannedMember}>Add to List</Button>
+                  <Button size="sm" variant="outline" onClick={simulateScan}>Scan Again</Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
     </div>
+
+    {/* QR Scanner Modal */}
+    </>
   );
 };
 
-export default ProfileScreen;
+export default memo(ProfileScreen);

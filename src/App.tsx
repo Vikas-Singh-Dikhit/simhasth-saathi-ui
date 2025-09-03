@@ -20,6 +20,7 @@ import NotFound from "./pages/NotFound";
 import { BottomNavigation } from "./components/ui/bottom-navigation";
 import Header from "./pages/Header";
 import { TranslationProvider, useTranslation } from './context/TranslationContext';
+import { GroupProvider } from './context/GroupContext';
 
 const queryClient = new QueryClient();
 
@@ -99,9 +100,11 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <TranslationProvider>
-        <BrowserRouter>
-          <AppWrapper />
-        </BrowserRouter>
+        <GroupProvider>
+          <BrowserRouter>
+            <AppWrapper />
+          </BrowserRouter>
+        </GroupProvider>
         <Toaster />
       </TranslationProvider>
     </TooltipProvider>

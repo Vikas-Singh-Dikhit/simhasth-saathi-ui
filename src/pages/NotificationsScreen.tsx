@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback, memo } from 'react';
 import { 
   Bell, 
   AlertTriangle, 
@@ -25,8 +25,26 @@ interface Notification {
   actionRequired?: boolean;
 }
 
+const getNotificationIcon = (type: string) => {
+  switch (type) {
+    case 'sos': return AlertTriangle;
+    case 'group': return Users;
+    case 'geofence': return MapPin;
+    case 'safety': return Shield;
+    case 'system': return Bell;
+    default: return Bell;
+  }
+};
+
+const getNotificationColor = (type: string, priority: string) => {
+  if (priority === 'high') return 'text-destructive';
+  if (type === 'safety') return 'text-sky-blue';
+  if (type === 'group') return 'text-success';
+  return 'text-primary';
+};
+
 const NotificationsScreen = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([
+  const initialNotifications = useMemo<Notification[]>(() => ([
     {
       id: '1',
       type: 'sos',
@@ -73,49 +91,26 @@ const NotificationsScreen = () => {
       isRead: false,
       priority: 'low'
     }
-  ]);
+  ]), []);
+  const [notifications, setNotifications] = useState<Notification[]>(() => initialNotifications);
 
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'sos': return AlertTriangle;
-      case 'group': return Users;
-      case 'geofence': return MapPin;
-      case 'safety': return Shield;
-      case 'system': return Bell;
-      default: return Bell;
-    }
-  };
+  const markAsRead = useCallback((id: string) => {
+    setNotifications(prev => prev.map(notif => notif.id === id ? { ...notif, isRead: true } : notif));
+  }, []);
 
-  const getNotificationColor = (type: string, priority: string) => {
-    if (priority === 'high') return 'text-destructive';
-    if (type === 'safety') return 'text-sky-blue';
-    if (type === 'group') return 'text-success';
-    return 'text-primary';
-  };
+  const markAllAsRead = useCallback(() => {
+    setNotifications(prev => prev.map(notif => ({ ...notif, isRead: true })));
+  }, []);
 
-  const markAsRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(notif => 
-        notif.id === id ? { ...notif, isRead: true } : notif
-      )
-    );
-  };
-
-  const markAllAsRead = () => {
-    setNotifications(prev => 
-      prev.map(notif => ({ ...notif, isRead: true }))
-    );
-  };
-
-  const deleteNotification = (id: string) => {
+  const deleteNotification = useCallback((id: string) => {
     setNotifications(prev => prev.filter(notif => notif.id !== id));
-  };
+  }, []);
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
-  const goBack = () => {
+  const goBack = useCallback(() => {
     window.history.back();
-  };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -254,4 +249,4 @@ const NotificationsScreen = () => {
   );
 };
 
-export default NotificationsScreen;
+export default memo(NotificationsScreen);
