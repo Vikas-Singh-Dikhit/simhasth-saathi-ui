@@ -1,6 +1,7 @@
 import React from 'react';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { motion } from 'framer-motion';
+import { AnimatedCard } from '@/components/ui/animated-card';
+import { AnimatedButton } from '@/components/ui/animated-button';
 import { StatusIndicator } from '@/components/ui/status-indicator';
 import {
   Users,
@@ -27,18 +28,41 @@ const Dashboard: React.FC<DashboardProps> = ({ groupCode }) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-saffron-light/30 via-background to-sky-blue-light/30">
-      <div className="px-4 py-6 pb-nav space-y-6">
+      <motion.div 
+        className="px-4 py-6 pb-nav space-y-6"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+      >
         {/* Group Status Card */}
-        <Card className="p-6 border-card-border shadow-medium bg-card/95 backdrop-blur-sm">
-          <div className="space-y-4">
+        <AnimatedCard className="p-6 border-card-border shadow-medium bg-card/95 backdrop-blur-sm">
+          <motion.div 
+            className="space-y-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-foreground">{t('groupStatus')}</h2>
-              <StatusIndicator status="safe" size="sm" />
+              <motion.div
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+              >
+                <StatusIndicator status="safe" size="sm" />
+              </motion.div>
             </div>
 
-            <div className="bg-accent/30 p-4 rounded-lg">
+            <motion.div 
+              className="bg-accent/30 p-4 rounded-lg"
+              whileHover={{ scale: 1.01 }}
+            >
               <div className="flex items-center gap-3 mb-3">
-                <Users className="h-5 w-5 text-primary" />
+                <motion.div
+                  animate={{ rotate: [0, 360] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                >
+                  <Users className="h-5 w-5 text-primary" />
+                </motion.div>
                 <span className="font-medium text-foreground">
                   {t('yourGroup')} • {mockGroupMembers.length} {t('members')}
                 </span>
@@ -46,47 +70,80 @@ const Dashboard: React.FC<DashboardProps> = ({ groupCode }) => {
 
               <div className="space-y-2">
                 {mockGroupMembers.map((member, idx) => (
-                  <div key={idx} className="flex items-center justify-between">
+                  <motion.div 
+                    key={idx} 
+                    className="flex items-center justify-between"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2 + idx * 0.1 }}
+                    whileHover={{ x: 5 }}
+                  >
                     <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 bg-success rounded-full"></div>
+                      <motion.div 
+                        className="h-2 w-2 bg-success rounded-full"
+                        animate={{ scale: [1, 1.2, 1] }}
+                        transition={{ duration: 2, repeat: Infinity, delay: idx * 0.3 }}
+                      />
                       <span className="text-sm text-foreground">{member.name}</span>
                     </div>
                     <span className="text-xs text-muted-foreground">{member.lastSeen}</span>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
 
-              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/50">
+              <motion.div 
+                className="flex items-center gap-2 mt-3 pt-3 border-t border-border/50"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.8 }}
+              >
                 <Clock className="h-3 w-3 text-muted-foreground" />
                 <span className="text-xs text-muted-foreground">{t('lastUpdate')}</span>
-              </div>
-            </div>
-          </div>
-        </Card>
+              </motion.div>
+            </motion.div>
+          </motion.div>
+        </AnimatedCard>
 
         {/* Quick Actions */}
-        <div className="space-y-4">
+        <motion.div 
+          className="space-y-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
           <h2 className="text-lg font-semibold text-foreground">{t('quickActions')}</h2>
           <div className="grid grid-cols-2 gap-4">
-            <Button
+            <AnimatedButton
               variant="destructive"
               size="lg"
               className="h-20 flex-col gap-2 bg-danger hover:bg-danger/90 text-white shadow-medium"
             >
-              <AlertTriangle className="h-6 w-6" />
+              <motion.div
+                animate={{ 
+                  scale: [1, 1.1, 1],
+                  rotate: [0, 5, -5, 0]
+                }}
+                transition={{ 
+                  duration: 0.5,
+                  repeat: Infinity,
+                  repeatDelay: 2
+                }}
+              >
+                <AlertTriangle className="h-6 w-6" />
+              </motion.div>
               <span className="text-sm font-medium">SOS</span>
-            </Button>
+            </AnimatedButton>
 
-            <Button
+            <AnimatedButton
               variant="secondary"
               size="lg"
               className="h-20 flex-col gap-2 bg-secondary hover:bg-secondary/90 shadow-medium"
             >
               <MapPin className="h-6 w-6" />
               <span className="text-sm font-medium">{t('findGroup')}</span>
-            </Button>
+            </AnimatedButton>
           </div>
-        </div>
+        </motion.div>
 
         {/* Service Cards */}
         <div className="grid grid-cols-1 gap-4">
@@ -134,8 +191,8 @@ const Dashboard: React.FC<DashboardProps> = ({ groupCode }) => {
               <span className="text-xs text-muted-foreground">Now</span>
             </div>
           </div>
-        </Card>
-      </div>
+        </motion.div>
+      </motion.div>
     </div>
   );
 };

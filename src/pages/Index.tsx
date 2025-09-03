@@ -44,7 +44,7 @@ const Index = () => {
       return <Onboarding onComplete={handleLanguageComplete} />;
 
     case 'login':
-      return <Login onLoginSuccess={handleLoginSuccess} language={language} />;
+      return <Login onLoginSuccess={handleLoginSuccess} />;
 
     case 'group-setup':
       return <GroupSetup onGroupCreated={handleGroupCreated} language={language} />;
