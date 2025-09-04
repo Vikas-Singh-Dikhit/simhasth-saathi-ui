@@ -14,6 +14,44 @@ import { toast } from 'sonner';
 
 // Group members are provided by GroupContext
 
+// Smooth animation helpers
+type LatLng = { lat: number; lng: number };
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t;
+}
+function easeInOutQuad(t: number) {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+function smoothMoveMarker(marker: L.Marker, to: LatLng, durationMs: number, animStateMap: Map<L.Marker, { raf?: number }>) {
+  try {
+    const fromLatLng = marker.getLatLng();
+    const from = { lat: fromLatLng.lat, lng: fromLatLng.lng };
+    const start = performance.now();
+    const state = animStateMap.get(marker) || {};
+    if ((state as any).raf) cancelAnimationFrame((state as any).raf);
+
+    const step = (now: number) => {
+      const elapsed = Math.min(1, (now - start) / durationMs);
+      const t = easeInOutQuad(elapsed);
+      const lat = lerp(from.lat, to.lat, t);
+      const lng = lerp(from.lng, to.lng, t);
+      marker.setLatLng([lat, lng]);
+
+      if (elapsed < 1) {
+        (state as any).raf = requestAnimationFrame(step);
+        animStateMap.set(marker, state as any);
+      } else {
+        animStateMap.delete(marker);
+      }
+    };
+
+    (state as any).raf = requestAnimationFrame(step);
+    animStateMap.set(marker, state as any);
+  } catch {
+    marker.setLatLng([to.lat, to.lng]);
+  }
+}
+
 const MapScreen: React.FC = () => {
   const { t } = useTranslation(); // ✅ Translation hook
   const { members, setUserLocation, userLocation, mapMode, helpdeskTarget, setMapMode } = useGroup();
@@ -30,12 +68,14 @@ const MapScreen: React.FC = () => {
   const helpdeskRoutePopupRef = useRef<L.Popup | null>(null);
   const lastGeoUpdateTsRef = useRef<number>(0);
   const lastHeadingRef = useRef<number | undefined>(undefined);
+  const userAnimRefs = useRef<Map<L.Marker, { raf?: number }>>(new Map());
   const routingControlRef = useRef<any>(null);
   const routePopupRef = useRef<L.Popup | null>(null);
   const lastFitForMemberIdRef = useRef<string | null>(null);
   const mapCenterHintHandledRef = useRef<string | null>(null);
   const infoPanelRef = useRef<HTMLDivElement | null>(null);
   const infoButtonRef = useRef<HTMLButtonElement | null>(null);
+  const memberAnimRefs = useRef<Map<L.Marker, { raf?: number }>>(new Map());
 
   // Static help centers
   const helpCenters = useMemo(() => ([
@@ -115,7 +155,7 @@ const MapScreen: React.FC = () => {
     return () => navigator.geolocation.clearWatch(watchId);
   }, [setUserLocation]);
 const initializedRef = useRef(false);
-const DEFAULT_ZOOM = 19; // maximum zoom-in for OSM tiles
+const DEFAULT_ZOOM = 16; // default zoom at initialization
 
   // Mount user marker and path once when both map and user location exist
   useEffect(() => {
@@ -128,34 +168,33 @@ const DEFAULT_ZOOM = 19; // maximum zoom-in for OSM tiles
     mapRef.current.setView([userLocation.lat, userLocation.lng], mapRef.current.getZoom());
   }, [userLocation, buildDirectionalIcon]);
 
-  // Imperatively update user marker and path on userLocation change
+  // Imperatively update user marker and path on userLocation change (smooth)
   useEffect(() => {
-  if (!mapRef.current || !userLocation) return;
-  const map = mapRef.current;
+    if (!mapRef.current || !userLocation) return;
+    const map = mapRef.current;
 
-  // update marker and icon
-  if (userMarkerRef.current) {
-    userMarkerRef.current.setLatLng([userLocation.lat, userLocation.lng]);
-    userMarkerRef.current.setIcon(buildDirectionalIcon('#2563eb', lastHeadingRef.current));
-  }
-  if (userPathRef.current) {
-    userPathRef.current.addLatLng([userLocation.lat, userLocation.lng]);
-  }
+    if (userMarkerRef.current) {
+      smoothMoveMarker(userMarkerRef.current, userLocation, 280, userAnimRefs.current);
+      userMarkerRef.current.setIcon(buildDirectionalIcon('#2563eb', lastHeadingRef.current));
+    }
+    if (userPathRef.current) {
+      userPathRef.current.addLatLng([userLocation.lat, userLocation.lng]);
+    }
 
-  // initial setView with default zoom only once
-  if (!initializedRef.current) {
-    map.setView([userLocation.lat, userLocation.lng], DEFAULT_ZOOM);
-    initializedRef.current = true;
-    return;
-  }
+    // initial setView with default zoom only once
+    if (!initializedRef.current) {
+      map.setView([userLocation.lat, userLocation.lng], DEFAULT_ZOOM);
+      initializedRef.current = true;
+      return;
+    }
 
-  // auto-pan only if marker is near edge
-  const bounds = map.getBounds();
-  const latlng = L.latLng(userLocation.lat, userLocation.lng);
-  if (!bounds.pad(-0.3).contains(latlng)) {
-    map.panTo(latlng, { animate: true });
-  }
-}, [userLocation, buildDirectionalIcon]); 
+    // auto-pan only if marker is near edge
+    const bounds = map.getBounds();
+    const latlng = L.latLng(userLocation.lat, userLocation.lng);
+    if (!bounds.pad(-0.3).contains(latlng)) {
+      map.panTo(latlng, { animate: true });
+    }
+  }, [userLocation, buildDirectionalIcon]);
 
   const groupStatus = useMemo(() => 'safe' as const, []);
 
@@ -241,7 +280,7 @@ const DEFAULT_ZOOM = 19; // maximum zoom-in for OSM tiles
       const icon = buildDirectionalIcon('#16a34a', m.headingDeg);
       const existing = cache.get(m.id);
       if (existing) {
-        existing.setLatLng([m.position.lat, m.position.lng]);
+        smoothMoveMarker(existing, m.position, 350, memberAnimRefs.current);
         existing.setIcon(icon);
       } else {
         const newMarker = L.marker([m.position.lat, m.position.lng], { icon })
@@ -602,7 +641,7 @@ const DEFAULT_ZOOM = 19; // maximum zoom-in for OSM tiles
           </Button>
         </div>
 
-        <MapContainer center={[23.1765, 75.7884]} zoom={14} className="h-full w-full" whenReady={() => { /* assigned in ref below */ }} ref={(instance) => { if (instance) { /* @ts-ignore */ mapRef.current = instance; } }}>
+        <MapContainer center={[23.1765, 75.7884]} zoom={16} className="h-full w-full" whenReady={() => { /* assigned in ref below */ }} ref={(instance) => { if (instance) { /* @ts-ignore */ mapRef.current = instance; } }}>
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         </MapContainer>
       </div>

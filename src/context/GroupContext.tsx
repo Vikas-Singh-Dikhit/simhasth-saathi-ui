@@ -59,8 +59,8 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
     const base = anchor || { lat: 23.1765, lng: 75.7884 };
     const names = pickRandomNames(count);
     const mockMembers: GroupMember[] = names.map((name) => {
-      const jitterLat = base.lat + (Math.random() - 0.5) * 0.0012;
-      const jitterLng = base.lng + (Math.random() - 0.5) * 0.0012;
+      const jitterLat = base.lat + (Math.random() - 0.5) * 0.004;
+      const jitterLng = base.lng + (Math.random() - 0.5) * 0.004;
       return {
         id: generateId('mem'),
         name,
@@ -89,10 +89,10 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
         const base = userLocation || (prev.find((m) => m.isSelf)?.position ?? { lat: 23.1765, lng: 75.7884 });
         return prev.map((m) => {
           if (m.isSelf) return m;
-          const deltaLat = (Math.random() - 0.5) * 0.0004;
-          const deltaLng = (Math.random() - 0.5) * 0.0004;
-          const towardUserLat = (base.lat - m.position.lat) * 0.05;
-          const towardUserLng = (base.lng - m.position.lng) * 0.05;
+          const deltaLat = (Math.random() - 0.5) * 0.0008;
+          const deltaLng = (Math.random() - 0.5) * 0.0008;
+          const towardUserLat = (base.lat - m.position.lat) * 0.02;
+          const towardUserLng = (base.lng - m.position.lng) * 0.02;
           const nextLat = m.position.lat + deltaLat + towardUserLat;
           const nextLng = m.position.lng + deltaLng + towardUserLng;
           // Compute heading from previous -> next
