@@ -60,6 +60,7 @@ const MapScreen: React.FC = () => {
   const [selectedMember, setSelectedMember] = useState<any | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
+  const userMarkerElRef = useRef<HTMLElement | null>(null);
   const userPathRef = useRef<L.Polyline | null>(null);
   const memberMarkersRef = useRef<Map<string, L.Marker>>(new Map());
   const helpdeskMarkerRef = useRef<L.Marker | null>(null);
@@ -68,6 +69,8 @@ const MapScreen: React.FC = () => {
   const helpdeskRoutePopupRef = useRef<L.Popup | null>(null);
   const lastGeoUpdateTsRef = useRef<number>(0);
   const lastHeadingRef = useRef<number | undefined>(undefined);
+  const prevHeadingRef = useRef<number>(0);
+  const prevUserPosRef = useRef<LatLng | null>(null);
   const userAnimRefs = useRef<Map<L.Marker, { raf?: number }>>(new Map());
   const routingControlRef = useRef<any>(null);
   const routePopupRef = useRef<L.Popup | null>(null);
@@ -113,13 +116,39 @@ const MapScreen: React.FC = () => {
   // Directional triangle icons (rotated by heading)
   const buildDirectionalIcon = useCallback((color: string, headingDeg?: number) => {
     const rotation = headingDeg ?? 0;
-    const svg = `
-      <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="transform: rotate(${rotation}deg);">
-        <g>
-          <polygon points="12,2 20,22 12,18 4,22" fill="${color}" stroke="white" stroke-width="2" />
-        </g>
-      </svg>`;
-    return L.divIcon({ html: svg, className: 'direction-icon', iconSize: [24, 24], iconAnchor: [12, 12] });
+    const html = `
+      <div class="direction-icon-wrapper" style="will-change: transform; transform: rotate(${rotation}deg);">
+        <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <g>
+            <polygon points="12,2 20,22 12,18 4,22" fill="${color}" stroke="white" stroke-width="2" />
+          </g>
+        </svg>
+      </div>`;
+    return L.divIcon({ html, className: 'direction-icon', iconSize: [24, 24], iconAnchor: [12, 12] });
+  }, []);
+
+  // Smoothly animate rotation without recreating the icon to avoid flicker
+  const animateHeadingRotation = useCallback((fromDeg: number, toDeg: number, durationMs: number) => {
+    const el = userMarkerElRef.current as HTMLElement | null;
+    if (!el) return;
+    const wrapper = el.querySelector('.direction-icon-wrapper') as HTMLElement | null;
+    if (!wrapper) return;
+    // normalize shortest rotation path
+    let start = fromDeg;
+    let end = toDeg;
+    let delta = end - start;
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+    const startTs = performance.now();
+    const step = (now: number) => {
+      const t = Math.min(1, (now - startTs) / durationMs);
+      const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      const angle = start + delta * eased;
+      wrapper.style.transform = `rotate(${angle}deg)`;
+      if (t < 1) requestAnimationFrame(step);
+      else lastHeadingRef.current = ((angle % 360) + 360) % 360;
+    };
+    requestAnimationFrame(step);
   }, []);
 
   // Helpdesk pin icon (SVG-based, no default Leaflet icon)
@@ -132,13 +161,13 @@ const MapScreen: React.FC = () => {
     return L.divIcon({ html: svg, className: 'helpdesk-pin', iconSize: [28, 28], iconAnchor: [14, 28] });
   }, []);
 
-  // Track user location with throttling (3–5s) and feed into GroupContext
+  // Track user location with tight throttling (0.8–1.2s) and feed into GroupContext
   useEffect(() => {
     if (!navigator.geolocation) return;
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
         const now = Date.now();
-        const minInterval = 3000 + Math.random() * 2000;
+        const minInterval = 800 + Math.random() * 400; // faster cadence for smoother path
         if (now - lastGeoUpdateTsRef.current < minInterval) return;
         lastGeoUpdateTsRef.current = now;
         const userLat = position.coords.latitude;
@@ -146,7 +175,23 @@ const MapScreen: React.FC = () => {
         const heading = typeof position.coords.heading === 'number' && !Number.isNaN(position.coords.heading)
           ? position.coords.heading
           : undefined;
-        lastHeadingRef.current = heading;
+        // if browser heading missing, compute from last point
+        if (heading == null && prevUserPosRef.current) {
+          const dLat = userLat - prevUserPosRef.current.lat;
+          const dLng = userLng - prevUserPosRef.current.lng;
+          if (Math.abs(dLat) > 1e-9 || Math.abs(dLng) > 1e-9) {
+            const rad = Math.atan2(dLng, dLat);
+            const computed = ((rad * 180) / Math.PI + 360) % 360;
+            prevHeadingRef.current = (lastHeadingRef.current ?? computed);
+            lastHeadingRef.current = computed;
+          }
+        } else {
+          if (typeof heading === 'number') {
+            prevHeadingRef.current = (lastHeadingRef.current ?? heading);
+            lastHeadingRef.current = heading;
+          }
+        }
+        prevUserPosRef.current = { lat: userLat, lng: userLng };
         setUserLocation(userLat, userLng);
       },
       (error) => console.error('Geolocation error:', error),
@@ -162,7 +207,10 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
     if (!mapRef.current || !userLocation || userMarkerRef.current) return;
     const marker = L.marker([userLocation.lat, userLocation.lng], { icon: buildDirectionalIcon('#2563eb', lastHeadingRef.current) }).addTo(mapRef.current);
     userMarkerRef.current = marker;
-    const path = L.polyline([[userLocation.lat, userLocation.lng]], { color: '#2563eb', weight: 4, opacity: 0.7 }).addTo(mapRef.current);
+    userMarkerElRef.current = marker.getElement() as HTMLElement | null;
+    const path = L.polyline([[userLocation.lat, userLocation.lng]], {
+      color: '#2563eb', weight: 4, opacity: 0.7, renderer: L.canvas(),
+    }).addTo(mapRef.current);
     userPathRef.current = path;
     // initial view without changing zoom level drastically
     mapRef.current.setView([userLocation.lat, userLocation.lng], mapRef.current.getZoom());
@@ -175,7 +223,10 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
 
     if (userMarkerRef.current) {
       smoothMoveMarker(userMarkerRef.current, userLocation, 280, userAnimRefs.current);
-      userMarkerRef.current.setIcon(buildDirectionalIcon('#2563eb', lastHeadingRef.current));
+      // rotate smoothly between previous and latest heading
+      const toHeading = typeof lastHeadingRef.current === 'number' ? lastHeadingRef.current : prevHeadingRef.current;
+      const fromHeading = prevHeadingRef.current;
+      animateHeadingRotation(fromHeading, toHeading, 260);
     }
     if (userPathRef.current) {
       userPathRef.current.addLatLng([userLocation.lat, userLocation.lng]);
@@ -194,7 +245,7 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
     if (!bounds.pad(-0.3).contains(latlng)) {
       map.panTo(latlng, { animate: true });
     }
-  }, [userLocation, buildDirectionalIcon]);
+  }, [userLocation, buildDirectionalIcon, animateHeadingRotation]);
 
   const groupStatus = useMemo(() => 'safe' as const, []);
 
@@ -641,7 +692,25 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
           </Button>
         </div>
 
-        <MapContainer center={[23.1765, 75.7884]} zoom={16} className="h-full w-full" whenReady={() => { /* assigned in ref below */ }} ref={(instance) => { if (instance) { /* @ts-ignore */ mapRef.current = instance; } }}>
+        <MapContainer
+          center={[23.1765, 75.7884]}
+          zoom={16}
+          className="h-full w-full"
+          preferCanvas={true}
+          wheelDebounceTime={35}
+          wheelPxPerZoomLevel={80}
+          zoomAnimation={true}
+          markerZoomAnimation={true}
+          touchZoom={true}
+          tapTolerance={15}
+          whenReady={() => { /* assigned in ref below */ }}
+          ref={(instance) => {
+            if (instance) {
+              // @ts-ignore
+              mapRef.current = instance;
+            }
+          }}
+        >
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         </MapContainer>
       </div>
