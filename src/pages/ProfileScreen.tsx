@@ -79,48 +79,48 @@ const ProfileScreen = () => {
 
   return (
     <>
-    <div className="min-h-screen bg-background pb-20">
-      <div className="p-4 space-y-6">
+    <div className="min-h-screen bg-background">
+      <div className="px-lg py-lg space-y-lg">
         {/* User Info Card */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4 mb-6">
-              <Avatar className="h-20 w-20">
+        <Card className="shadow-soft">
+          <CardContent className="p-lg">
+            <div className="flex items-center gap-lg mb-lg">
+              <Avatar className="h-16 w-16">
                 <AvatarImage src="/placeholder-avatar.jpg" />
-                <AvatarFallback className="text-2xl bg-primary/10 text-primary">
+                <AvatarFallback className="text-lg bg-primary/10 text-primary">
                   {userProfile.name.charAt(0)}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
-                <h2 className="text-xl font-bold text-card-foreground">{userProfile.name}</h2>
-                <p className="text-muted-foreground">{t('age')}: {userProfile.age}</p>
-                <div className="flex items-center gap-2 mt-2">
+                <h2 className="text-base font-bold text-foreground">{userProfile.name}</h2>
+                <p className="text-sm text-muted-foreground">{t('age')}: {userProfile.age}</p>
+                <div className="flex items-center gap-sm mt-sm">
                   <StatusIndicator status="safe" size="sm" />
                 </div>
               </div>
-              <Button variant="outline" size="sm">
-                <Edit className="h-4 w-4" />
+              <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                <Edit className="h-3 w-3" />
               </Button>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Phone className="h-5 w-5 text-muted-foreground" />
-                <span className="font-mono">{userProfile.phone}</span>
+            <div className="space-y-md">
+              <div className="flex items-center gap-md">
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                <span className="font-mono text-sm">{userProfile.phone}</span>
               </div>
 
-              <div className="flex items-center gap-3">
-                <Users className="h-5 w-5 text-muted-foreground" />
-                <span>{t('groupId')}: {userProfile.groupId}</span>
-                <Button variant="ghost" size="sm" onClick={copyGroupId}>
-                  <Copy className="h-4 w-4" />
+              <div className="flex items-center gap-md">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">{t('groupId')}: {userProfile.groupId}</span>
+                <Button variant="ghost" size="sm" onClick={copyGroupId} className="h-6 w-6 p-0">
+                  <Copy className="h-3 w-3" />
                 </Button>
               </div>
             </div>
 
-            <div className="pt-2">
-              <Button onClick={() => setScannerOpen(true)} className="w-full sm:w-auto">
-                <QrCode className="h-4 w-4 mr-2" />
+            <div className="pt-md">
+              <Button onClick={() => setScannerOpen(true)} className="w-full h-10" size="sm">
+                <QrCode className="h-4 w-4 mr-sm" />
                 Add Member
               </Button>
             </div>
@@ -128,44 +128,44 @@ const ProfileScreen = () => {
         </Card>
 
         {/* Emergency Contacts */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">{t('emergencyContacts')}</CardTitle>
+        <Card className="shadow-soft">
+          <CardHeader className="pb-md">
+            <CardTitle className="text-base">{t('emergencyContacts')}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-sm">
             {userProfile.emergencyContacts.map((contact, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+              <div key={index} className="flex items-center justify-between p-md bg-muted rounded-lg">
                 <div>
-                  <p className="font-medium">{contact.name}</p>
-                  <p className="text-sm text-muted-foreground">{contact.relation}</p>
+                  <p className="font-medium text-sm">{contact.name}</p>
+                  <p className="text-xs text-muted-foreground">{contact.relation}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-mono text-sm">{contact.phone}</p>
-                  <Button variant="ghost" size="sm" className="h-6 px-2">
+                  <p className="font-mono text-xs">{contact.phone}</p>
+                  <Button variant="ghost" size="sm" className="h-6 px-sm">
                     <Phone className="h-3 w-3" />
                   </Button>
                 </div>
               </div>
             ))}
-            <Button variant="outline" className="w-full mt-3">
-              <Phone className="h-4 w-4 mr-2" />
+            <Button variant="outline" className="w-full mt-md h-10">
+              <Phone className="h-4 w-4 mr-sm" />
               {t('addContact')}
             </Button>
           </CardContent>
         </Card>
 
         {/* Location Sharing */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">{t('locationSharing')}</CardTitle>
+        <Card className="shadow-soft">
+          <CardHeader className="pb-md">
+            <CardTitle className="text-base">{t('locationSharing')}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-lg">
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="location-sharing" className="text-base font-medium">
+                <Label htmlFor="location-sharing" className="text-sm font-medium">
                   {t('shareLocation')}
                 </Label>
-                <p className="text-sm text-muted-foreground">{t('shareLocationDesc')}</p>
+                <p className="text-xs text-muted-foreground">{t('shareLocationDesc')}</p>
               </div>
               <Switch
                 id="location-sharing"
@@ -176,11 +176,11 @@ const ProfileScreen = () => {
 
             <Button
               variant="outline"
-              className="w-full"
+              className="w-full h-10"
               onClick={handleShareLocation}
               disabled={!shareLocation}
             >
-              <Share className="h-4 w-4 mr-2" />
+              <Share className="h-4 w-4 mr-sm" />
               {t('sendLocationSMS')}
             </Button>
 
@@ -191,28 +191,28 @@ const ProfileScreen = () => {
         </Card>
 
         {/* Group Info */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">{t('groupInfo')}</CardTitle>
+        <Card className="shadow-soft">
+          <CardHeader className="pb-md">
+            <CardTitle className="text-base">{t('groupInfo')}</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
+          <CardContent className="space-y-md">
+            <div className="space-y-sm">
+              <div className="flex items-center justify-between text-sm">
                 <span>{t('totalMembers')}</span>
                 <span className="font-semibold">{members.length}</span>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between text-sm">
                 <span>{t('onlineMembers')}</span>
                 <span className="font-semibold text-success">3</span>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between text-sm">
                 <span>{t('groupCreated')}</span>
-                <span className="text-sm text-muted-foreground">2 दिन पहले</span>
+                <span className="text-xs text-muted-foreground">2 दिन पहले</span>
               </div>
             </div>
 
-            <Button variant="outline" className="w-full mt-4">
-              <Users className="h-4 w-4 mr-2" />
+            <Button variant="outline" className="w-full h-10">
+              <Users className="h-4 w-4 mr-sm" />
               {t('viewGroupMembers')}
             </Button>
           </CardContent>

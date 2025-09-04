@@ -59,17 +59,26 @@ Colors: Saffron, White, Sky Blue with accessibility focus
     
     /* Touch-friendly sizing */
     --touch-target: 44px;            /* Minimum touch target size */
-    --button-height: 56px;           /* Large button height */
-    --nav-height: 80px;              /* Bottom navigation height */
+    --button-height: 48px;           /* Optimized button height */
+    --nav-height: 70px;              /* Compact bottom navigation */
     
     /* Border radius for mobile-friendly UI */
-    --radius: 12px;                  /* Larger radius for mobile */
-    --radius-large: 20px;           /* Extra large for cards */
+    --radius: 8px;                   /* Consistent radius */
+    --radius-large: 12px;            /* Cards radius */
+    --radius-xl: 16px;               /* Large elements */
     
     /* Shadows for elevation */
-    --shadow-soft: 0 2px 8px hsl(30 100% 60% / 0.1);
-    --shadow-medium: 0 4px 16px hsl(30 100% 60% / 0.15);
-    --shadow-strong: 0 8px 32px hsl(30 100% 60% / 0.2);
+    --shadow-soft: 0 2px 8px hsl(30 100% 60% / 0.08);
+    --shadow-medium: 0 4px 16px hsl(30 100% 60% / 0.12);
+    --shadow-strong: 0 8px 32px hsl(30 100% 60% / 0.16);
+    
+    /* Compact spacing system */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 12px;
+    --space-lg: 16px;
+    --space-xl: 20px;
+    --space-2xl: 24px;
 
     --sidebar-background: 0 0% 98%;
 

@@ -24,8 +24,8 @@ export const IonicContent: React.FC<IonicContentProps> = ({
       ref={contentRef}
       className={cn(
         "flex-1 overflow-y-auto overflow-x-hidden",
-        "pt-16 pb-nav", // Account for fixed header and bottom nav
-        "bg-gradient-to-br from-saffron-light/20 via-background to-sky-blue-light/20",
+        "pt-14", // Account for compact header
+        "bg-gradient-to-br from-saffron-light/10 via-background to-sky-blue-light/10",
         className
       )}
       initial={{ opacity: 0 }}
@@ -35,10 +35,10 @@ export const IonicContent: React.FC<IonicContentProps> = ({
       <AnimatePresence mode="wait">
         <motion.div
           key="content"
-          initial={{ y: 20, opacity: 0 }}
+          initial={{ y: 10, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          exit={{ y: -20, opacity: 0 }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
+          exit={{ y: -10, opacity: 0 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
           className="min-h-full"
         >
           {children}

@@ -56,66 +56,61 @@ const SettingsScreen = () => {
         showNotifications
         onNotificationClick={() => console.log("Notifications clicked")}
       /> */}
-    <div className="min-h-screen bg-background pb-20">
-      {/* Header */}
-      <div className="px-4 py-4 bg-card border-b border-card-border">
-        <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-background">
+      <div className="px-lg py-lg space-y-lg">
+        {/* Header */}
+        <div className="flex items-center gap-md">
           <Button variant="ghost" size="sm" onClick={goBack}>
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-xl font-bold text-card-foreground">सेटिंग्स</h1>
+          <h1 className="text-base font-bold text-foreground">सेटिंग्स</h1>
         </div>
-      </div>
-
-      <div className="p-4 space-y-6">
         {/* Language Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Globe className="h-5 w-5" />
+        <Card className="shadow-soft">
+          <CardHeader className="pb-md">
+            <CardTitle className="text-base flex items-center gap-sm">
+              <Globe className="h-4 w-4" />
               भाषा चयन
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <Label>ऐप की भाषा</Label>
-              <Select value={settings.language} onValueChange={(value) => updateSetting('language', value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {languages.map((lang) => (
-                    <SelectItem key={lang.code} value={lang.code}>
-                      <div className="flex items-center gap-2">
-                        <span>{lang.nativeName}</span>
-                        {settings.language === lang.code && <Check className="h-4 w-4 text-primary" />}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-sm text-muted-foreground">
-                भाषा बदलने के लिए ऐप को रीस्टार्ट करना होगा
-              </p>
-            </div>
+          <CardContent className="space-y-md">
+            <Label className="text-sm">ऐप की भाषा</Label>
+            <Select value={settings.language} onValueChange={(value) => updateSetting('language', value)}>
+              <SelectTrigger className="h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {languages.map((lang) => (
+                  <SelectItem key={lang.code} value={lang.code}>
+                    <div className="flex items-center gap-sm">
+                      <span>{lang.nativeName}</span>
+                      {settings.language === lang.code && <Check className="h-3 w-3 text-primary" />}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              भाषा बदलने के लिए ऐप को रीस्टार्ट करना होगा
+            </p>
           </CardContent>
         </Card>
 
         {/* Connectivity Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Wifi className="h-5 w-5" />
+        <Card className="shadow-soft">
+          <CardHeader className="pb-md">
+            <CardTitle className="text-base flex items-center gap-sm">
+              <Wifi className="h-4 w-4" />
               कनेक्टिविटी
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-lg">
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="offline-mode" className="text-base font-medium">
+                <Label htmlFor="offline-mode" className="text-sm font-medium">
                   ऑफलाइन मोड
                 </Label>
-                <p className="text-sm text-muted-foreground">इंटरनेट न होने पर भी काम करे</p>
+                <p className="text-xs text-muted-foreground">इंटरनेट न होने पर भी काम करे</p>
               </div>
               <Switch 
                 id="offline-mode"
@@ -126,10 +121,10 @@ const SettingsScreen = () => {
 
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="sms-backup" className="text-base font-medium">
+                <Label htmlFor="sms-backup" className="text-sm font-medium">
                   SMS बैकअप
                 </Label>
-                <p className="text-sm text-muted-foreground">ऑफलाइन में SMS के द्वारा अलर्ट</p>
+                <p className="text-xs text-muted-foreground">ऑफलाइन में SMS के द्वारा अलर्ट</p>
               </div>
               <Switch 
                 id="sms-backup"
@@ -141,21 +136,21 @@ const SettingsScreen = () => {
         </Card>
 
         {/* Privacy Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Shield className="h-5 w-5" />
+        <Card className="shadow-soft">
+          <CardHeader className="pb-md">
+            <CardTitle className="text-base flex items-center gap-sm">
+              <Shield className="h-4 w-4" />
               गोपनीयता नियंत्रण
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-lg">
             <div>
-              <Label className="text-base font-medium mb-3 block">
+              <Label className="text-sm font-medium mb-md block">
                 कौन आपकी स्थिति देख सकता है?
               </Label>
-              <div className="space-y-3">
+              <div className="space-y-md">
                 {privacyOptions.map((option) => (
-                  <div key={option.value} className="flex items-center space-x-3">
+                  <div key={option.value} className="flex items-center gap-md">
                     <div 
                       className={`w-4 h-4 rounded-full border-2 flex items-center justify-center cursor-pointer ${
                         settings.locationSharing === option.value
@@ -165,12 +160,12 @@ const SettingsScreen = () => {
                       onClick={() => updateSetting('locationSharing', option.value)}
                     >
                       {settings.locationSharing === option.value && (
-                        <div className="w-2 h-2 bg-white rounded-full" />
+                        <div className="w-1.5 h-1.5 bg-white rounded-full" />
                       )}
                     </div>
                     <div className="flex-1 cursor-pointer" onClick={() => updateSetting('locationSharing', option.value)}>
-                      <p className="font-medium">{option.label}</p>
-                      <p className="text-sm text-muted-foreground">{option.desc}</p>
+                      <p className="font-medium text-sm">{option.label}</p>
+                      <p className="text-xs text-muted-foreground">{option.desc}</p>
                     </div>
                   </div>
                 ))}
@@ -180,20 +175,20 @@ const SettingsScreen = () => {
         </Card>
 
         {/* Notification Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Bell className="h-5 w-5" />
+        <Card className="shadow-soft">
+          <CardHeader className="pb-md">
+            <CardTitle className="text-base flex items-center gap-sm">
+              <Bell className="h-4 w-4" />
               सूचनाएं
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-lg">
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="notifications" className="text-base font-medium">
+                <Label htmlFor="notifications" className="text-sm font-medium">
                   पुश नोटिफिकेशन
                 </Label>
-                <p className="text-sm text-muted-foreground">अलर्ट और अपडेट्स पाएं</p>
+                <p className="text-xs text-muted-foreground">अलर्ट और अपडेट्स पाएं</p>
               </div>
               <Switch 
                 id="notifications"
@@ -204,10 +199,10 @@ const SettingsScreen = () => {
 
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="auto-sos" className="text-base font-medium">
+                <Label htmlFor="auto-sos" className="text-sm font-medium">
                   ऑटो SOS
                 </Label>
-                <p className="text-sm text-muted-foreground">तेज हिलने पर अपने आप SOS भेजे</p>
+                <p className="text-xs text-muted-foreground">तेज हिलने पर अपने आप SOS भेजे</p>
               </div>
               <Switch 
                 id="auto-sos"
@@ -219,24 +214,24 @@ const SettingsScreen = () => {
         </Card>
 
         {/* About Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">ऐप के बारे में</CardTitle>
+        <Card className="shadow-soft">
+          <CardHeader className="pb-md">
+            <CardTitle className="text-base">ऐप के बारे में</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between">
+          <CardContent className="space-y-sm">
+            <div className="flex justify-between text-sm">
               <span>वर्जन</span>
               <span className="font-mono">1.0.0</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between text-sm">
               <span>अंतिम अपडेट</span>
               <span>15 जनवरी, 2024</span>
             </div>
-            <div className="text-center pt-4">
+            <div className="text-center pt-md">
               <p className="text-sm text-muted-foreground">
                 सिंहस्थ साथी - आपका सुरक्षा साथी
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground mt-xs">
                 भारत सरकार द्वारा प्रमाणित
               </p>
             </div>
@@ -244,12 +239,12 @@ const SettingsScreen = () => {
         </Card>
 
         {/* Emergency Reset */}
-        <Card className="border-destructive/20">
-          <CardContent className="p-6">
-            <Button variant="destructive" className="w-full">
+        <Card className="border-destructive/20 shadow-soft">
+          <CardContent className="p-lg">
+            <Button variant="destructive" className="w-full h-10">
               सभी सेटिंग्स रीसेट करें
             </Button>
-            <p className="text-xs text-muted-foreground text-center mt-2">
+            <p className="text-xs text-muted-foreground text-center mt-sm">
               यह सभी व्यक्तिगत सेटिंग्स को वापस डिफ़ॉल्ट में कर देगा
             </p>
           </CardContent>

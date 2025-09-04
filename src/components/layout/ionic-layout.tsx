@@ -106,7 +106,7 @@ export const IonicLayout: React.FC<IonicLayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="flex flex-col h-screen w-full bg-background">
+    <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
       {/* Fixed Header */}
       {currentRoute.showHeader && (
         <IonicHeader
@@ -121,7 +121,7 @@ export const IonicLayout: React.FC<IonicLayoutProps> = ({ children }) => {
       )}
 
       {/* Scrollable Content Area */}
-      <IonicContent className={!currentRoute.showBottomNav ? 'pb-0' : ''}>
+      <IonicContent className={!currentRoute.showBottomNav ? 'pb-0' : 'pb-nav'}>
         {children}
       </IonicContent>
 

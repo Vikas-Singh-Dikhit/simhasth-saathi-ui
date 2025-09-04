@@ -70,20 +70,20 @@ export const IonicHeader: React.FC<IonicHeaderProps> = ({
       animate={{ y: 0, opacity: 1 }}
       className={cn(
         "fixed top-0 left-0 right-0 z-50",
-        "bg-card/95 backdrop-blur-sm border-b border-card-border",
+        "bg-card/95 backdrop-blur-md border-b border-card-border",
         "shadow-soft",
         className
       )}
     >
-      <div className="h-16 flex items-center justify-between px-4">
+      <div className="h-14 flex items-center justify-between px-lg">
         {renderLeftIcon()}
         
-        <div className="flex-1 text-center px-4">
+        <div className="flex-1 text-center px-md">
           <motion.h1 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1 }}
-            className="text-lg font-semibold text-foreground leading-tight"
+            className="text-base font-semibold text-foreground leading-tight truncate"
           >
             {title}
           </motion.h1>
@@ -92,7 +92,7 @@ export const IonicHeader: React.FC<IonicHeaderProps> = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="text-sm text-muted-foreground"
+              className="text-xs text-muted-foreground truncate"
             >
               {subtitle}
             </motion.p>

@@ -33,55 +33,55 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
       className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-sm border-t border-card-border shadow-strong z-50"
     >
-      <div className="flex items-center justify-around px-1 py-2" style={{ height: 'var(--nav-height)' }}>
+      <div className="flex items-center justify-around px-sm py-sm h-nav">
         {navItems.map((item, index) => (
           <motion.div
             key={item.path}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1, duration: 0.3 }}
+            transition={{ delay: index * 0.05, duration: 0.2 }}
             className="flex-1"
           >
             <NavLink
               to={item.path}
               className={({ isActive }) =>
                 cn(
-                  'flex flex-col items-center justify-center rounded-lg transition-all duration-300',
-                  'min-h-touch px-2 py-2 mx-1 relative',
+                  'flex flex-col items-center justify-center rounded-lg transition-all duration-200',
+                  'min-h-touch px-xs py-sm mx-xs relative',
                   'hover:scale-105 active:scale-95',
                   isActive
-                    ? 'text-primary bg-accent shadow-medium'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    ? 'text-primary bg-accent/80 shadow-soft'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
                 )
               }
             >
               {({ isActive }) => (
                 <>
                   <motion.div
-                    whileTap={{ scale: 0.9 }}
-                    className="relative"
+                    whileTap={{ scale: 0.85 }}
+                    className="relative flex items-center justify-center"
                   >
                     <item.icon 
                       className={cn(
-                        'h-6 w-6 mb-1 transition-colors duration-200',
+                        'h-5 w-5 mb-1 transition-colors duration-200',
                         isActive ? 'text-primary' : 'text-current'
                       )} 
                     />
                     {isActive && (
                       <motion.div
                         layoutId="activeIndicator"
-                        className="absolute -top-1 -left-1 -right-1 -bottom-1 bg-primary/10 rounded-full"
-                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                        className="absolute -inset-1 bg-primary/15 rounded-lg"
+                        transition={{ type: "spring", stiffness: 400, damping: 30 }}
                       />
                     )}
                   </motion.div>
                   <motion.span 
                     className={cn(
-                      "text-xs font-medium leading-none transition-all duration-200",
+                      "text-xs font-medium leading-none transition-all duration-200 text-center",
                       isActive ? "text-primary" : "text-current"
                     )}
                     animate={{ 
-                      scale: isActive ? 1.05 : 1,
+                      scale: isActive ? 1.0 : 0.95,
                       fontWeight: isActive ? 600 : 500 
                     }}
                   >

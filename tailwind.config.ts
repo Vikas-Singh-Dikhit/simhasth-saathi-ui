@@ -79,13 +79,25 @@ export default {
 			spacing: {
 				'touch': 'var(--touch-target)',
 				'button': 'var(--button-height)',
-				'nav': 'var(--nav-height)'
+				'nav': 'var(--nav-height)',
+				'xs': 'var(--space-xs)',
+				'sm': 'var(--space-sm)',
+				'md': 'var(--space-md)',
+				'lg': 'var(--space-lg)',
+				'xl': 'var(--space-xl)',
+				'2xl': 'var(--space-2xl)',
+				'pb-nav': '80px'
 			},
 			borderRadius: {
-				lg: 'var(--radius-large)',
+				'xl': 'var(--radius-xl)',
+				'lg': 'var(--radius-large)',
 				DEFAULT: 'var(--radius)',
-				md: 'calc(var(--radius) - 4px)',
-				sm: 'calc(var(--radius) - 8px)'
+				'md': 'calc(var(--radius) - 2px)',
+				'sm': 'calc(var(--radius) - 4px)'
+			},
+			minHeight: {
+				'touch': 'var(--touch-target)',
+				'button': 'var(--button-height)'
 			},
 			boxShadow: {
 				soft: 'var(--shadow-soft)',
