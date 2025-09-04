@@ -94,7 +94,7 @@ const Dashboard: React.FC<DashboardProps> = ({ groupCode }) => {
         {/* Service Cards */}
         <div className="grid grid-cols-1 gap-4">
           <Card className="p-4 border-card-border shadow-soft bg-card/95 backdrop-blur-sm">
-            <button className="w-full text-left">
+            <button className="w-full text-left" onClick={() => navigate('/sos')}>
               <div className="flex items-center gap-4">
                 <div className="bg-primary/10 p-3 rounded-lg">
                   <Shield className="h-6 w-6 text-primary" />
@@ -109,7 +109,7 @@ const Dashboard: React.FC<DashboardProps> = ({ groupCode }) => {
           </Card>
 
           <Card className="p-4 border-card-border shadow-soft bg-card/95 backdrop-blur-sm">
-            <button className="w-full text-left">
+            <button className="w-full text-left"  onClick={() => navigate('/helpdesk')}>
               <div className="flex items-center gap-4">
                 <div className="bg-sky-blue/10 p-3 rounded-lg">
                   <Users className="h-6 w-6 text-sky-blue" />

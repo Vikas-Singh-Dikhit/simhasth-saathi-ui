@@ -114,6 +114,8 @@ const MapScreen: React.FC = () => {
     );
     return () => navigator.geolocation.clearWatch(watchId);
   }, [setUserLocation]);
+const initializedRef = useRef(false);
+const DEFAULT_ZOOM = 19; // maximum zoom-in for OSM tiles
 
   // Mount user marker and path once when both map and user location exist
   useEffect(() => {
@@ -128,23 +130,32 @@ const MapScreen: React.FC = () => {
 
   // Imperatively update user marker and path on userLocation change
   useEffect(() => {
-    if (!mapRef.current || !userLocation) return;
-    if (userMarkerRef.current) {
-      userMarkerRef.current.setLatLng([userLocation.lat, userLocation.lng]);
-      userMarkerRef.current.setIcon(buildDirectionalIcon('#2563eb', lastHeadingRef.current));
-    }
-    if (userPathRef.current) {
-      userPathRef.current.addLatLng([userLocation.lat, userLocation.lng]);
-    }
-    // auto-pan only if getting near viewport edge
-    const map = mapRef.current;
-    const bounds = map.getBounds();
-    const latlng = L.latLng(userLocation.lat, userLocation.lng);
-    if (!bounds.pad(-0.3).contains(latlng)) {
-      map.panTo(latlng, { animate: true } as any);
-    }
-    mapRef.current.setView([userLocation.lat, userLocation.lng], 16);
-  }, [userLocation, buildDirectionalIcon]);
+  if (!mapRef.current || !userLocation) return;
+  const map = mapRef.current;
+
+  // update marker and icon
+  if (userMarkerRef.current) {
+    userMarkerRef.current.setLatLng([userLocation.lat, userLocation.lng]);
+    userMarkerRef.current.setIcon(buildDirectionalIcon('#2563eb', lastHeadingRef.current));
+  }
+  if (userPathRef.current) {
+    userPathRef.current.addLatLng([userLocation.lat, userLocation.lng]);
+  }
+
+  // initial setView with default zoom only once
+  if (!initializedRef.current) {
+    map.setView([userLocation.lat, userLocation.lng], DEFAULT_ZOOM);
+    initializedRef.current = true;
+    return;
+  }
+
+  // auto-pan only if marker is near edge
+  const bounds = map.getBounds();
+  const latlng = L.latLng(userLocation.lat, userLocation.lng);
+  if (!bounds.pad(-0.3).contains(latlng)) {
+    map.panTo(latlng, { animate: true });
+  }
+}, [userLocation, buildDirectionalIcon]); 
 
   const groupStatus = useMemo(() => 'safe' as const, []);
 
@@ -341,7 +352,7 @@ const MapScreen: React.FC = () => {
         if (!hint || typeof hint.lat !== 'number' || typeof hint.lng !== 'number') return;
         mapCenterHintHandledRef.current = raw;
         const latlng = L.latLng(hint.lat, hint.lng);
-        map.flyTo(latlng, Math.max(map.getZoom(), 17));
+        map.flyTo(latlng, Math.max(map.getZoom(), 19));
         const highlight = L.circleMarker(latlng, {
           radius: 12,
           color: '#ef4444',
@@ -440,7 +451,7 @@ const MapScreen: React.FC = () => {
       }
       const label = `Nearest Help Center: ${helpdeskTarget.name}`;
       helpdeskMarkerRef.current.bindPopup(label).openPopup();
-      map.flyTo(latlng, Math.max(map.getZoom(), 17));
+      map.flyTo(latlng, Math.max(map.getZoom(), 19));
       // Auto-draw route immediately (live like member path)
       if (userLocation) {
         // clear existing
