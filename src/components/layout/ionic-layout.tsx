@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { IonicHeader } from './ionic-header';
 import { IonicContent } from './ionic-content';
@@ -35,10 +35,11 @@ export const IonicLayout: React.FC<IonicLayoutProps> = ({ children }) => {
       showNotificationBadge: true
     },
     '/map': {
-      title: t('mapTitle') || 'Live Map',
+      title: t('groupStatus') || 'Group Status',
+      subtitle: undefined,
       leftIcon: 'back',
       rightIcon: 'notifications',
-      showHeader: false, // Map typically full screen
+      showHeader: false,
       showBottomNav: true
     },
     '/sos': {
@@ -104,24 +105,27 @@ export const IonicLayout: React.FC<IonicLayoutProps> = ({ children }) => {
       console.log('Open notifications');
     }
   };
-
+  useEffect(()=>{
+    console.info(location,"current ")
+    console.info(location.pathname != "/map","fdghhdf ")
+  })
   return (
     <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
       {/* Fixed Header */}
       {currentRoute.showHeader && (
-        <IonicHeader
-          title={currentRoute.title || 'Simhasth Saathi'}
-          subtitle={currentRoute.subtitle}
-          leftIcon={currentRoute.leftIcon}
-          rightIcon={currentRoute.rightIcon}
-          onLeftClick={handleLeftClick}
-          onRightClick={handleRightClick}
-          showNotificationBadge={currentRoute.showNotificationBadge}
-        />
-      )}
+      <IonicHeader
+        title={currentRoute.title || 'Simhasth Saathi'}
+        subtitle={currentRoute.subtitle}
+        leftIcon={currentRoute.leftIcon}
+        rightIcon={currentRoute.rightIcon}
+        onLeftClick={handleLeftClick}
+        onRightClick={handleRightClick}
+        showNotificationBadge={currentRoute.showNotificationBadge}
+      />
+    )}
 
       {/* Scrollable Content Area */}
-      <IonicContent className={!currentRoute.showBottomNav ? 'pb-0' : 'pb-nav'}>
+      <IonicContent className={`${!currentRoute.showHeader ? 'pt-0' : ''} ${!currentRoute.showBottomNav ? 'pb-0' : 'pb-nav'}`}>
         {children}
       </IonicContent>
 

@@ -10,6 +10,8 @@ import { useTranslation } from '@/context/TranslationContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { useAppStore } from '@/store/appStore';
+import { useGroup } from '@/context/GroupContext';
+import { useNavigate } from 'react-router-dom';
 
 const HelpdeskScreen = () => {
   const [activeTab, setActiveTab] = useState('digital');
@@ -20,27 +22,97 @@ const HelpdeskScreen = () => {
   const [reportPreview, setReportPreview] = useState<typeof reportForm | null>(null);
   const [searchForm, setSearchForm] = useState<{ name: string; age: string; description: string }>({ name: '', age: '', description: '' });
   const [results, setResults] = useState<Array<{ id: string; name: string; age: number; description: string; lastSeen: string; found?: boolean }>>([]);
+  const [talkOpen, setTalkOpen] = useState(false);
+  const [chatMode, setChatMode] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [messages, setMessages] = useState<Array<{ id: string; from: 'user' | 'volunteer'; text: string; ts: number }>>([]);
+  const [policeDialogOpen, setPoliceDialogOpen] = useState(false);
+  const groupCode = useAppStore(s => s.groupCode);
+  const userLocation = useAppStore(s => s.userLocation);
+  const members = useAppStore(s => s.members);
+  const userId = useAppStore(s => s.userId);
   const { t } = useTranslation();
+  const { setMapMode } = useGroup();
   const submitReportToStore = useAppStore(s => s.submitReport);
   const markFoundInStore = useAppStore(s => s.markFound);
   const addQrScan = useAppStore(s => s.addQrScan);
+  const navigate = useNavigate();
+
+  // Static list of help centers (can be moved to JSON later)
+  const helpCenters = useMemo(() => ([
+    { id: 'hc1', name: 'Ramghat Help Center', lat: 23.1769, lng: 75.7889 },
+    { id: 'hc2', name: 'Mahakal Gate Help Center', lat: 23.1825, lng: 75.7685 },
+    { id: 'hc3', name: 'Kalideh Road Help Center', lat: 23.1992, lng: 75.7841 },
+  ]), []);
+
+  // Haversine distance in meters
+  const haversine = (a: { lat: number; lng: number }, b: { lat: number; lng: number }): number => {
+    const R = 6371000; // Earth radius in meters
+    const dLat = (b.lat - a.lat) * Math.PI / 180;
+    const dLng = (b.lng - a.lng) * Math.PI / 180;
+    const lat1 = a.lat * Math.PI / 180;
+    const lat2 = b.lat * Math.PI / 180;
+    const sinDLat = Math.sin(dLat / 2);
+    const sinDLng = Math.sin(dLng / 2);
+    const aa = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
+    const c = 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
+    return R * c;
+  };
+
+  const findNearestHelpCenter = (origin: { lat: number; lng: number }) => {
+    let best = helpCenters[0];
+    let bestDist = Number.POSITIVE_INFINITY;
+    for (const hc of helpCenters) {
+      const dist = haversine(origin, { lat: hc.lat, lng: hc.lng });
+      if (dist < bestDist) {
+        best = hc;
+        bestDist = dist;
+      }
+    }
+    return { center: best, distanceM: bestDist };
+  };
+
+  const handleFindNearestHelpCenter = () => {
+    const selfLoc = getSelfLastLocation();
+    if (!selfLoc) {
+      toast.error('Location not available');
+      return;
+    }
+    const { center } = findNearestHelpCenter(selfLoc);
+    // Set global map mode to helpdesk with selected target
+    setMapMode('helpdesk', { id: center.id, name: center.name, lat: center.lat, lng: center.lng });
+    try { localStorage.setItem('mapCenter', JSON.stringify({ lat: center.lat, lng: center.lng, ts: Date.now(), source: 'helpcenter', label: center.name })); } catch {}
+    navigate('/map');
+    toast.success(`${center.name}`);
+  };
 
   const digitalHelpOptions = useMemo(() => ([
     {
       icon: Phone,
       title: t('callVolunteer'),
-      subtitle: '24/7 उपलब्ध सहायता',
+      subtitle: 'Call or chat with a volunteer',
       color: 'text-primary',
       bgColor: 'bg-primary/10',
-      action: () => console.log('Call volunteer')
+      action: () => {
+        setTalkOpen(true);
+        setChatMode(false);
+      }
     },
+    // {
+    //   icon: Phone,
+    //   title: t('callVolunteer'),
+    //   subtitle: '24/7 उपलब्ध सहायता',
+    //   color: 'text-primary',
+    //   bgColor: 'bg-primary/10',
+    //   action: () => console.log('Call volunteer')
+    // },
     {
       icon: Shield,
       title: t('contactPolice'),
       subtitle: 'तत्काल सुरक्षा सहायता',
       color: 'text-sky-blue',
       bgColor: 'bg-sky-blue/10',
-      action: () => console.log('Contact police')
+      action: () => setPoliceDialogOpen(true)
     },
     {
       icon: MapPin,
@@ -48,7 +120,7 @@ const HelpdeskScreen = () => {
       subtitle: 'आपके पास का हेल्प डेस्क',
       color: 'text-success',
       bgColor: 'bg-success/10',
-      action: () => console.log('Find help center')
+      action: handleFindNearestHelpCenter
     }
   ]), [t]);
 
@@ -103,8 +175,126 @@ const HelpdeskScreen = () => {
     toast.success('Marked as found');
   };
 
+  const startChatIfNeeded = () => {
+    if (!chatMode) setChatMode(true);
+    if (messages.length === 0) {
+      setMessages([
+        { id: 'm_welcome', from: 'volunteer', text: 'Hi! How can I assist you today?', ts: Date.now() }
+      ]);
+    }
+  };
+
+  const handleSendMessage = () => {
+    const text = chatInput.trim();
+    if (!text) return;
+    const userMsg = { id: `u_${Date.now()}`, from: 'user' as const, text, ts: Date.now() };
+    setMessages(prev => [...prev, userMsg]);
+    setChatInput('');
+    // Mock volunteer reply
+    window.setTimeout(() => {
+      setMessages(prev => [...prev, { id: `v_${Date.now()}`, from: 'volunteer', text: 'Volunteer will contact you shortly', ts: Date.now() }]);
+    }, 800);
+  };
+
+  // Resolve last known location similar to SOS screen, with robust fallbacks
+  const getSelfLastLocation = (): { lat: number; lng: number } | null => {
+    const selfMember = members.find(m => m.isSelf);
+    const fromUser = userLocation || null;
+    const fromPosition = selfMember?.position || null;
+    const fromPath = Array.isArray(selfMember?.path) && selfMember!.path.length > 0
+      ? { lat: selfMember!.path[selfMember!.path.length - 1].lat, lng: selfMember!.path[selfMember!.path.length - 1].lng }
+      : null;
+    let fromMapCenter: { lat?: number; lng?: number } | null = null;
+    try {
+      const raw = localStorage.getItem('mapCenter');
+      if (raw) {
+        const parsed = JSON.parse(raw) as { lat?: number; lng?: number };
+        if (typeof parsed.lat === 'number' && typeof parsed.lng === 'number') {
+          fromMapCenter = { lat: parsed.lat, lng: parsed.lng };
+        }
+      }
+    } catch {}
+    const DEFAULT_FALLBACK = { lat: 23.1765, lng: 75.7884 };
+    const lat = fromUser?.lat ?? fromPosition?.lat ?? fromPath?.lat ?? fromMapCenter?.lat ?? DEFAULT_FALLBACK.lat;
+    const lng = fromUser?.lng ?? fromPosition?.lng ?? fromPath?.lng ?? fromMapCenter?.lng ?? DEFAULT_FALLBACK.lng;
+    return typeof lat === 'number' && typeof lng === 'number' ? { lat, lng } : null;
+  };
+
+  const buildPoliceAlertPayload = () => {
+    const selfMember = members.find(m => m.isSelf);
+    const name = selfMember?.name || 'You';
+    const phone = selfMember?.phone || '';
+    const loc = getSelfLastLocation();
+    const when = new Date();
+    return {
+      userId: userId || 'anonymous',
+      name,
+      phone,
+      groupCode: groupCode || '',
+      location: loc ? { lat: loc.lat, lng: loc.lng } : null,
+      createdAt: when.toISOString(),
+      issue: 'Emergency',
+      status: 'new',
+      source: 'app',
+    } as const;
+  };
+
+  const sendToBackend = async (payload: any) => {
+    // Attempt to POST to a backend endpoint (configure via VITE_POLICE_ALERT_URL)
+    const url = (import.meta as any).env?.VITE_POLICE_ALERT_URL || '/api/police-alert';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('Failed to send police alert');
+    return await res.json().catch(() => ({}));
+  };
+
+  const sendSmsFallback = (payload: any) => {
+    const loc = payload.location ? `${payload.location.lat}, ${payload.location.lng}` : 'Unknown';
+    const time = new Date(payload.createdAt).toLocaleString();
+    const smsBody = [
+      'SIMSAATHI POLICE ALERT',
+      `Name: ${payload.name || 'N/A'}`,
+      `Phone: ${payload.phone || 'N/A'}`,
+      `Group: ${payload.groupCode || 'N/A'}`,
+      `Location: ${loc}`,
+      `Time: ${time}`,
+      'Issue: Emergency'
+    ].join('%0A');
+    const number = '+919876543210';
+    // Use sms: with body param (note: support varies by platform)
+    window.location.href = `sms:${number}?&body=${smsBody}`;
+  };
+
+  const handlePoliceCall = () => {
+    window.location.href = 'tel:100';
+    toast.success('Call initiated');
+    setPoliceDialogOpen(false);
+  };
+
+  const handlePoliceAlert = async () => {
+    const payload = buildPoliceAlertPayload();
+    try {
+      if (navigator.onLine) {
+        await sendToBackend(payload);
+        toast.success('Police alert sent successfully');
+      } else {
+        sendSmsFallback(payload);
+        toast.success('SMS fallback initiated');
+      }
+    } catch (e) {
+      // On failure, attempt SMS fallback
+      sendSmsFallback(payload);
+      toast.success('SMS fallback initiated');
+    } finally {
+      setPoliceDialogOpen(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col h-[90vh] bg-background">
+    <div className="flex flex-col bg-background">
 
       {/* Tabs */}
       <div className="flex-1">
@@ -115,7 +305,7 @@ const HelpdeskScreen = () => {
           </TabsList>
 
           {/* Digital Helpdesk Tab */}
-          <TabsContent value="digital" className="flex-1 p-4 space-y-4">
+           <TabsContent value="digital" className="flex-1 p-4 space-y-4">
             <div className="grid gap-4">
               {digitalHelpOptions.map((option, index) => (
                 <Card key={index} className="cursor-pointer hover:shadow-medium transition-shadow" onClick={option.action}>
@@ -263,6 +453,49 @@ const HelpdeskScreen = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Talk to Volunteer Modal */}
+      <Dialog open={talkOpen} onOpenChange={(v) => { setTalkOpen(v); if (!v) { setChatMode(false); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Talk to Volunteer</DialogTitle>
+          </DialogHeader>
+          {!chatMode ? (
+            <div className="space-y-3">
+              <Button className="w-full" onClick={() => { window.location.href = 'tel:+919876543210'; }}>Call Volunteer</Button>
+              <Button variant="outline" className="w-full" onClick={() => { startChatIfNeeded(); }}>Chat with Volunteer</Button>
+            </div>
+          ) : (
+            <div className="flex flex-col h-[360px]">
+              <div className="flex-1 overflow-auto border rounded-md p-3 space-y-2 bg-accent/10">
+                {messages.map(m => (
+                  <div key={m.id} className={`max-w-[80%] px-3 py-2 rounded-md text-sm ${m.from === 'user' ? 'ml-auto bg-primary text-primary-foreground' : 'mr-auto bg-muted'}`}>
+                    <div>{m.text}</div>
+                    <div className="text-[10px] opacity-70 mt-1">{new Date(m.ts).toLocaleTimeString()}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <Input value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="Type your message..." onKeyDown={(e) => { if (e.key === 'Enter') handleSendMessage(); }} />
+                <Button onClick={handleSendMessage}>Send</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Contact Police Modal */}
+      <Dialog open={policeDialogOpen} onOpenChange={setPoliceDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('contactPolice') || 'Contact Police'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Button className="w-full" onClick={handlePoliceCall}>📞 Call Police Control Room (100)</Button>
+            <Button variant="outline" className="w-full" onClick={handlePoliceAlert}>🚨 Send Emergency Alert</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Missing Report Modal */}
       <Dialog open={reportOpen} onOpenChange={setReportOpen}>

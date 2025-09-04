@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { SuspenseFallback } from '@/components/SuspenseFallback';
 const Onboarding = React.lazy(() => import('@/components/onboarding').then(m => ({ default: m.Onboarding })));
 const Login = React.lazy(() => import('@/components/login').then(m => ({ default: m.Login })));
 const GroupSetup = React.lazy(() => import('@/components/group-setup').then(m => ({ default: m.GroupSetup })));
@@ -40,7 +41,7 @@ const Index = () => {
     case 'onboarding':
       return (
         <ErrorBoundary>
-          <Suspense fallback={<div className="p-6">Loading…</div>}>
+          <Suspense fallback={<SuspenseFallback />}>
             <Onboarding onComplete={handleLanguageComplete} />
           </Suspense>
         </ErrorBoundary>
@@ -49,7 +50,7 @@ const Index = () => {
     case 'login':
       return (
         <ErrorBoundary>
-          <Suspense fallback={<div className="p-6">Loading…</div>}>
+          <Suspense fallback={<SuspenseFallback />}>
             <Login onLoginSuccess={handleLoginSuccess} />
           </Suspense>
         </ErrorBoundary>
@@ -58,7 +59,7 @@ const Index = () => {
     case 'group-setup':
       return (
         <ErrorBoundary>
-          <Suspense fallback={<div className="p-6">Loading…</div>}>
+          <Suspense fallback={<SuspenseFallback />}>
             <GroupSetup onGroupCreated={handleGroupCreated} language={language} />
           </Suspense>
         </ErrorBoundary>

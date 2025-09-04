@@ -15,10 +15,13 @@ interface GroupContextValue {
   userId: string | null;
   userLocation: { lat: number; lng: number } | null;
   members: GroupMember[];
+  mapMode: 'groups' | 'helpdesk';
+  helpdeskTarget: { id: string; name: string; lat: number; lng: number } | null;
   joinGroup: (groupCode: string) => void;
   createGroup: (groupCode: string) => void;
   leaveGroup: () => void;
   setUserLocation: (lat: number, lng: number) => void;
+  setMapMode: (mode: 'groups' | 'helpdesk', target?: { id: string; name: string; lat: number; lng: number } | null) => void;
 }
 
 const GroupContext = createContext<GroupContextValue | undefined>(undefined);
@@ -45,6 +48,8 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
   const [userId, setUserId] = useState<string | null>(localStorage.getItem(STORAGE_KEYS.userId));
   const [userLocation, setUserLocationState] = useState<{ lat: number; lng: number } | null>(null);
   const [members, setMembers] = useState<GroupMember[]>([]);
+  const [mapMode, setMapModeState] = useState<'groups' | 'helpdesk'>('groups');
+  const [helpdeskTarget, setHelpdeskTarget] = useState<{ id: string; name: string; lat: number; lng: number } | null>(null);
 
   const updateIntervalRef = useRef<number | null>(null);
 
@@ -162,6 +167,15 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
     ensureSelfMember({ lat, lng });
   }, [ensureSelfMember]);
 
+  const setMapMode = useCallback((mode: 'groups' | 'helpdesk', target?: { id: string; name: string; lat: number; lng: number } | null) => {
+    setMapModeState(mode);
+    if (mode === 'helpdesk') {
+      setHelpdeskTarget(target ?? null);
+    } else {
+      setHelpdeskTarget(null);
+    }
+  }, []);
+
   const joinGroup = useCallback((code: string) => {
     const uid = userId || generateId('usr');
     setUserId(uid);
@@ -228,11 +242,14 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
     userId,
     userLocation,
     members,
+    mapMode,
+    helpdeskTarget,
     joinGroup,
     createGroup,
     leaveGroup,
     setUserLocation,
-  }), [groupCode, userId, userLocation, members, joinGroup, createGroup, leaveGroup, setUserLocation]);
+    setMapMode,
+  }), [groupCode, userId, userLocation, members, mapMode, helpdeskTarget, joinGroup, createGroup, leaveGroup, setUserLocation, setMapMode]);
 
   return (
     <GroupContext.Provider value={value}>
