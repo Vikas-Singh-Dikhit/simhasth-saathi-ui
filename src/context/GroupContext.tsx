@@ -89,10 +89,11 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
         const base = userLocation || (prev.find((m) => m.isSelf)?.position ?? { lat: 23.1765, lng: 75.7884 });
         return prev.map((m) => {
           if (m.isSelf) return m;
-          const deltaLat = (Math.random() - 0.5) * 0.0008;
-          const deltaLng = (Math.random() - 0.5) * 0.0008;
-          const towardUserLat = (base.lat - m.position.lat) * 0.02;
-          const towardUserLng = (base.lng - m.position.lng) * 0.02;
+          // Slower drift per tick
+          const deltaLat = (Math.random() - 0.5) * 0.00015;
+          const deltaLng = (Math.random() - 0.5) * 0.00015;
+          const towardUserLat = (base.lat - m.position.lat) * 0.006;
+          const towardUserLng = (base.lng - m.position.lng) * 0.006;
           const nextLat = m.position.lat + deltaLat + towardUserLat;
           const nextLng = m.position.lng + deltaLng + towardUserLng;
           // Compute heading from previous -> next
@@ -114,7 +115,8 @@ export const GroupProvider = ({ children }: { children: React.ReactNode }) => {
         });
       });
 
-      const nextDelay = 5000 + Math.random() * 5000; // 5–10s
+      // Shorter interval with smaller steps = smoother, slower movement
+      const nextDelay = 3000 + Math.random() * 3000; // 3–6s
       updateIntervalRef.current = window.setTimeout(tick, nextDelay);
     };
 

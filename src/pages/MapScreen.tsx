@@ -74,6 +74,9 @@ const MapScreen: React.FC = () => {
   const userAnimRefs = useRef<Map<L.Marker, { raf?: number }>>(new Map());
   const routingControlRef = useRef<any>(null);
   const routePopupRef = useRef<L.Popup | null>(null);
+  const routeLineRef = useRef<L.Polyline | null>(null); // fallback straight line
+  const routeUpdateDebounceRef = useRef<number | null>(null);
+  const selectedMemberRef = useRef<any | null>(null);
   const lastFitForMemberIdRef = useRef<string | null>(null);
   const mapCenterHintHandledRef = useRef<string | null>(null);
   const infoPanelRef = useRef<HTMLDivElement | null>(null);
@@ -114,10 +117,11 @@ const MapScreen: React.FC = () => {
   }, [helpCenters, haversine]);
 
   // Directional triangle icons (rotated by heading)
-  const buildDirectionalIcon = useCallback((color: string, headingDeg?: number) => {
+  const buildDirectionalIcon = useCallback((color: string, headingDeg?: number, highlight?: boolean) => {
     const rotation = headingDeg ?? 0;
     const html = `
-      <div class="direction-icon-wrapper" style="will-change: transform; transform: rotate(${rotation}deg);">
+      <div class="direction-icon-wrapper" style="position: relative; will-change: transform; transform: rotate(${rotation}deg);">
+        ${highlight ? '<div style="position:absolute; left:50%; top:50%; width:36px; height:36px; transform: translate(-50%, -50%); border-radius:50%; box-shadow: 0 0 0 6px rgba(37,99,235,0.20), 0 0 12px 4px rgba(37,99,235,0.25);"></div>' : ''}
         <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <g>
             <polygon points="12,2 20,22 12,18 4,22" fill="${color}" stroke="white" stroke-width="2" />
@@ -311,6 +315,41 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
 
   const handleMarkerClick = useCallback((member: any) => () => setSelectedMember(member), []);
 
+  // Debounced helper to update routing control waypoints or fallback line
+  const updateLiveRoute = useCallback((map: L.Map, userPos: L.LatLng, memberPos: L.LatLng) => {
+    if (routeUpdateDebounceRef.current) {
+      window.clearTimeout(routeUpdateDebounceRef.current);
+      routeUpdateDebounceRef.current = null;
+    }
+    routeUpdateDebounceRef.current = window.setTimeout(() => {
+      if (routingControlRef.current) {
+        try {
+          routingControlRef.current.setWaypoints([userPos, memberPos]);
+          if (routeLineRef.current && map.hasLayer(routeLineRef.current)) {
+            map.removeLayer(routeLineRef.current);
+          }
+        } catch {
+          // fall back
+        }
+      } else {
+        if (!routeLineRef.current) {
+          routeLineRef.current = L.polyline([userPos, memberPos], { color: '#2563eb', weight: 5, opacity: 0.9, renderer: L.canvas() }).addTo(map);
+        } else {
+          routeLineRef.current.setLatLngs([userPos, memberPos]);
+          if (!map.hasLayer(routeLineRef.current)) map.addLayer(routeLineRef.current);
+        }
+        const distM = map.distance(userPos, memberPos);
+        const etaMin = Math.round((distM / 1.4) / 60);
+        const mid = L.latLng((userPos.lat + memberPos.lat) / 2, (userPos.lng + memberPos.lng) / 2);
+        if (!routePopupRef.current) routePopupRef.current = L.popup();
+        routePopupRef.current
+          .setLatLng(mid)
+          .setContent(`<div><strong>${(distM/1000).toFixed(2)} km</strong> • ${etaMin} min</div>`)
+          .openOn(map);
+      }
+    }, 250);
+  }, []);
+
   // Imperatively manage member markers for smooth updates (only in groups mode)
   useEffect(() => {
     if (!mapRef.current) return;
@@ -328,10 +367,12 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
     const presentIds = new Set<string>();
     members.filter(m => !m.isSelf).forEach((m) => {
       presentIds.add(m.id);
-      const icon = buildDirectionalIcon('#16a34a', m.headingDeg);
+      const isSelected = !!(selectedMember && selectedMember.id === m.id);
+      const icon = buildDirectionalIcon('#16a34a', m.headingDeg, isSelected);
       const existing = cache.get(m.id);
       if (existing) {
-        smoothMoveMarker(existing, m.position, 350, memberAnimRefs.current);
+        // Slightly longer animation duration for gentler, slower perceived motion
+        smoothMoveMarker(existing, m.position, 600, memberAnimRefs.current);
         existing.setIcon(icon);
       } else {
         const newMarker = L.marker([m.position.lat, m.position.lng], { icon })
@@ -375,7 +416,7 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
       // Build or update routing control (OSRM)
       const waypoints = [userPos, memberPos];
       if (routingControlRef.current) {
-        routingControlRef.current.setWaypoints(waypoints);
+        updateLiveRoute(map, userPos, memberPos);
       } else {
         const osrmRouter = (L as any).Routing.OSRMv1 ? new (L as any).Routing.OSRMv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }) : undefined;
         const control = (L as any).Routing.control({
@@ -386,6 +427,7 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
           fitSelectedRoutes: false,
           show: false,
           showAlternatives: true,
+          createMarker: () => null,
           lineOptions: { styles: [{ color: '#2563eb', weight: 5, opacity: 0.9 }] },
           altLineOptions: { styles: [{ color: '#9ca3af', weight: 4, opacity: 0.6, dashArray: '6,8' }] },
         })
@@ -404,6 +446,12 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
             .setLatLng([mid.lat, mid.lng])
             .setContent(`<div><strong>${distKm} km</strong> • ${etaMin} min</div>`)
             .openOn(map);
+          if (routeLineRef.current && map.hasLayer(routeLineRef.current)) {
+            map.removeLayer(routeLineRef.current);
+          }
+        })
+        .on('routingerror', () => {
+          updateLiveRoute(map, userPos, memberPos);
         })
         .addTo(map);
         routingControlRef.current = control;
@@ -414,6 +462,7 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
         map.fitBounds(bounds.pad(0.2), { animate: true } as any);
         lastFitForMemberIdRef.current = selected.id;
       }
+      selectedMemberRef.current = selected;
     } else {
       // No active selection -> remove routing and popup if exists
       if (routingControlRef.current) {
@@ -424,9 +473,25 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
         map.closePopup(routePopupRef.current);
         routePopupRef.current = null;
       }
+      if (routeLineRef.current) {
+        if (map.hasLayer(routeLineRef.current)) map.removeLayer(routeLineRef.current);
+        routeLineRef.current = null;
+      }
       lastFitForMemberIdRef.current = null;
     }
-  }, [selectedMember, members, userLocation]);
+  }, [selectedMember, members, userLocation, updateLiveRoute]);
+
+  // Keep route updated as positions change (debounced)
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+    const selected = selectedMemberRef.current ? members.find(m => m.id === selectedMemberRef.current.id) : null;
+    if (!selected) return;
+    if (!userLocation) return;
+    const userPos = L.latLng(userLocation.lat, userLocation.lng);
+    const memberPos = L.latLng(selected.position.lat, selected.position.lng);
+    updateLiveRoute(map, userPos, memberPos);
+  }, [userLocation, members, updateLiveRoute]);
 
   // Center/highlight based on hint from other screens (e.g., SOS "View on Map")
   useEffect(() => {
