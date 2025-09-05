@@ -83,6 +83,11 @@ const MapScreen: React.FC = () => {
   const infoButtonRef = useRef<HTMLButtonElement | null>(null);
   const memberAnimRefs = useRef<Map<L.Marker, { raf?: number }>>(new Map());
 
+  // New refs for robust routing
+  const osrmRoutingControlRef = useRef<any>(null);
+  const fallbackRouteLineRef = useRef<L.Polyline | null>(null);
+  const fallbackRoutePopupRef = useRef<L.Popup | null>(null);
+
   // Static help centers
   const helpCenters = useMemo(() => ([
     { id: 'hc1', name: 'Ramghat Help Center', lat: 23.1769, lng: 75.7889 },
@@ -316,37 +321,113 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
   const handleMarkerClick = useCallback((member: any) => () => setSelectedMember(member), []);
 
   // Debounced helper to update routing control waypoints or fallback line
-  const updateLiveRoute = useCallback((map: L.Map, userPos: L.LatLng, memberPos: L.LatLng) => {
+  const updateLiveRoute = useCallback((map: L.Map, userPos: L.LatLng, memberPos: L.LatLng, selectedMemberId: string) => {
     if (routeUpdateDebounceRef.current) {
       window.clearTimeout(routeUpdateDebounceRef.current);
       routeUpdateDebounceRef.current = null;
     }
+
     routeUpdateDebounceRef.current = window.setTimeout(() => {
-      if (routingControlRef.current) {
-        try {
-          routingControlRef.current.setWaypoints([userPos, memberPos]);
-          if (routeLineRef.current && map.hasLayer(routeLineRef.current)) {
-            map.removeLayer(routeLineRef.current);
-          }
-        } catch {
-          // fall back
-        }
-      } else {
-        if (!routeLineRef.current) {
-          routeLineRef.current = L.polyline([userPos, memberPos], { color: '#2563eb', weight: 5, opacity: 0.9, renderer: L.canvas() }).addTo(map);
+      const waypoints = [userPos, memberPos];
+
+      const createOrUpdateRoutingControl = () => {
+        if (osrmRoutingControlRef.current) {
+          osrmRoutingControlRef.current.setWaypoints(waypoints);
         } else {
-          routeLineRef.current.setLatLngs([userPos, memberPos]);
-          if (!map.hasLayer(routeLineRef.current)) map.addLayer(routeLineRef.current);
+          const osrmRouter = (L as any).Routing.OSRMv1 ? new (L as any).Routing.OSRMv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }) : undefined;
+          osrmRoutingControlRef.current = (L as any).Routing.control({
+            waypoints,
+            router: osrmRouter,
+            addWaypoints: false,
+            draggableWaypoints: false,
+            fitSelectedRoutes: false,
+            show: false,
+            showAlternatives: true,
+            createMarker: () => null,
+            lineOptions: { styles: [{ color: '#2563eb', weight: 5, opacity: 0.9 }] },
+            altLineOptions: { styles: [{ color: '#9ca3af', weight: 4, opacity: 0.6, dashArray: '6,8' }] },
+          })
+            .on('routesfound', (e: any) => {
+              const route = e.routes?.[0];
+              if (!route) return;
+              const distKm = (route.summary.totalDistance / 1000).toFixed(2);
+              const etaMin = Math.round(route.summary.totalTime / 60);
+              const midIndex = Math.floor(route.coordinates.length / 2);
+              const mid = route.coordinates[midIndex];
+
+              if (fallbackRouteLineRef.current && map.hasLayer(fallbackRouteLineRef.current)) {
+                map.removeLayer(fallbackRouteLineRef.current);
+              }
+              if (fallbackRoutePopupRef.current) {
+                map.closePopup(fallbackRoutePopupRef.current);
+                fallbackRoutePopupRef.current = null;
+              }
+
+              if (!routePopupRef.current) {
+                routePopupRef.current = L.popup();
+              }
+              routePopupRef.current
+                .setLatLng([mid.lat, mid.lng])
+                .setContent(`<div><strong>${distKm} km</strong> • ${etaMin} min</div>`)
+                .openOn(map);
+            })
+            .on('routingerror', () => {
+              // OSRM failed, switch to fallback polyline
+              if (osrmRoutingControlRef.current && map.hasLayer(osrmRoutingControlRef.current)) {
+                map.removeControl(osrmRoutingControlRef.current);
+                osrmRoutingControlRef.current = null;
+              }
+              drawFallbackRoute();
+            })
+            .addTo(map);
+        }
+        if (fallbackRouteLineRef.current && map.hasLayer(fallbackRouteLineRef.current)) {
+          map.removeLayer(fallbackRouteLineRef.current);
+        }
+        if (fallbackRoutePopupRef.current) {
+          map.closePopup(fallbackRoutePopupRef.current);
+          fallbackRoutePopupRef.current = null;
+        }
+      };
+
+      const drawFallbackRoute = () => {
+        if (osrmRoutingControlRef.current) {
+          map.removeControl(osrmRoutingControlRef.current);
+          osrmRoutingControlRef.current = null;
+        }
+        if (routePopupRef.current) {
+          map.closePopup(routePopupRef.current);
+          routePopupRef.current = null;
+        }
+
+        if (!fallbackRouteLineRef.current) {
+          fallbackRouteLineRef.current = L.polyline([userPos, memberPos], { color: '#2563eb', weight: 5, opacity: 0.9, renderer: L.canvas() }).addTo(map);
+        } else {
+          fallbackRouteLineRef.current.setLatLngs([userPos, memberPos]);
+          if (!map.hasLayer(fallbackRouteLineRef.current)) map.addLayer(fallbackRouteLineRef.current);
         }
         const distM = map.distance(userPos, memberPos);
         const etaMin = Math.round((distM / 1.4) / 60);
         const mid = L.latLng((userPos.lat + memberPos.lat) / 2, (userPos.lng + memberPos.lng) / 2);
-        if (!routePopupRef.current) routePopupRef.current = L.popup();
-        routePopupRef.current
+        if (!fallbackRoutePopupRef.current) fallbackRoutePopupRef.current = L.popup();
+        fallbackRoutePopupRef.current
           .setLatLng(mid)
-          .setContent(`<div><strong>${(distM/1000).toFixed(2)} km</strong> • ${etaMin} min</div>`)
+          .setContent(`<div><strong>${(distM / 1000).toFixed(2)} km</strong> • ${etaMin} min</div>`)
           .openOn(map);
+      };
+
+      // Always show a fallback route immediately
+      drawFallbackRoute();
+      // Then try to get the OSRM route
+      createOrUpdateRoutingControl();
+
+      // Fit bounds only when a new member is selected
+      if (lastFitForMemberIdRef.current !== selectedMemberId) {
+        const bounds = L.latLngBounds([userPos, memberPos]);
+        map.fitBounds(bounds.pad(0.2), { animate: true } as any);
+        lastFitForMemberIdRef.current = selectedMemberId;
       }
+
     }, 250);
   }, []);
 
@@ -413,69 +494,25 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
     const memberPos = selected ? L.latLng(selected.position.lat, selected.position.lng) : null;
 
     if (userPos && memberPos && selected) {
-      // Build or update routing control (OSRM)
-      const waypoints = [userPos, memberPos];
-      if (routingControlRef.current) {
-        updateLiveRoute(map, userPos, memberPos);
-      } else {
-        const osrmRouter = (L as any).Routing.OSRMv1 ? new (L as any).Routing.OSRMv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }) : undefined;
-        const control = (L as any).Routing.control({
-          waypoints,
-          router: osrmRouter,
-          addWaypoints: false,
-          draggableWaypoints: false,
-          fitSelectedRoutes: false,
-          show: false,
-          showAlternatives: true,
-          createMarker: () => null,
-          lineOptions: { styles: [{ color: '#2563eb', weight: 5, opacity: 0.9 }] },
-          altLineOptions: { styles: [{ color: '#9ca3af', weight: 4, opacity: 0.6, dashArray: '6,8' }] },
-        })
-        .on('routesfound', (e: any) => {
-          // Show popup with distance + ETA at mid point of main route
-          const route = e.routes?.[0];
-          if (!route) return;
-          const distKm = (route.summary.totalDistance / 1000).toFixed(2);
-          const etaMin = Math.round(route.summary.totalTime / 60);
-          const midIndex = Math.floor(route.coordinates.length / 2);
-          const mid = route.coordinates[midIndex];
-          if (!routePopupRef.current) {
-            routePopupRef.current = L.popup();
-          }
-          routePopupRef.current
-            .setLatLng([mid.lat, mid.lng])
-            .setContent(`<div><strong>${distKm} km</strong> • ${etaMin} min</div>`)
-            .openOn(map);
-          if (routeLineRef.current && map.hasLayer(routeLineRef.current)) {
-            map.removeLayer(routeLineRef.current);
-          }
-        })
-        .on('routingerror', () => {
-          updateLiveRoute(map, userPos, memberPos);
-        })
-        .addTo(map);
-        routingControlRef.current = control;
-      }
-      // Fit bounds only when a new member is selected
-      if (lastFitForMemberIdRef.current !== selected.id) {
-        const bounds = L.latLngBounds([userPos, memberPos]);
-        map.fitBounds(bounds.pad(0.2), { animate: true } as any);
-        lastFitForMemberIdRef.current = selected.id;
-      }
+      updateLiveRoute(map, userPos, memberPos, selected.id);
       selectedMemberRef.current = selected;
     } else {
       // No active selection -> remove routing and popup if exists
-      if (routingControlRef.current) {
-        map.removeControl(routingControlRef.current);
-        routingControlRef.current = null;
+      if (osrmRoutingControlRef.current) {
+        map.removeControl(osrmRoutingControlRef.current);
+        osrmRoutingControlRef.current = null;
       }
       if (routePopupRef.current) {
         map.closePopup(routePopupRef.current);
         routePopupRef.current = null;
       }
-      if (routeLineRef.current) {
-        if (map.hasLayer(routeLineRef.current)) map.removeLayer(routeLineRef.current);
-        routeLineRef.current = null;
+      if (fallbackRouteLineRef.current) {
+        if (map.hasLayer(fallbackRouteLineRef.current)) map.removeLayer(fallbackRouteLineRef.current);
+        fallbackRouteLineRef.current = null;
+      }
+      if (fallbackRoutePopupRef.current) {
+        map.closePopup(fallbackRoutePopupRef.current);
+        fallbackRoutePopupRef.current = null;
       }
       lastFitForMemberIdRef.current = null;
     }
@@ -490,7 +527,7 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
     if (!userLocation) return;
     const userPos = L.latLng(userLocation.lat, userLocation.lng);
     const memberPos = L.latLng(selected.position.lat, selected.position.lng);
-    updateLiveRoute(map, userPos, memberPos);
+    updateLiveRoute(map, userPos, memberPos, selected.id);
   }, [userLocation, members, updateLiveRoute]);
 
   // Center/highlight based on hint from other screens (e.g., SOS "View on Map")
@@ -557,51 +594,94 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
             toast.error('Location not available');
             return;
           }
-          // clear any existing straight polyline
-          if (helpdeskPolylineRef.current) {
-            if (map.hasLayer(helpdeskPolylineRef.current)) map.removeLayer(helpdeskPolylineRef.current);
-            helpdeskPolylineRef.current = null;
+          // clear any existing straight polyline or routing control
+          if (fallbackRouteLineRef.current) {
+            if (map.hasLayer(fallbackRouteLineRef.current)) map.removeLayer(fallbackRouteLineRef.current);
+            fallbackRouteLineRef.current = null;
           }
-          // clear any existing routing control and popup
-          if (helpdeskRoutingControlRef.current) {
-            map.removeControl(helpdeskRoutingControlRef.current);
-            helpdeskRoutingControlRef.current = null;
+          if (fallbackRoutePopupRef.current) {
+            map.closePopup(fallbackRoutePopupRef.current);
+            fallbackRoutePopupRef.current = null;
           }
-          if (helpdeskRoutePopupRef.current) {
-            map.closePopup(helpdeskRoutePopupRef.current);
-            helpdeskRoutePopupRef.current = null;
+          if (osrmRoutingControlRef.current) {
+            map.removeControl(osrmRoutingControlRef.current);
+            osrmRoutingControlRef.current = null;
+          }
+          if (routePopupRef.current) {
+            map.closePopup(routePopupRef.current);
+            routePopupRef.current = null;
           }
 
           const userPos = L.latLng(userLocation.lat, userLocation.lng);
           const targetPos = L.latLng(latlng[0], latlng[1]);
-          const osrmRouter = (L as any).Routing?.OSRMv1 ? new (L as any).Routing.OSRMv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }) : undefined;
-          const control = (L as any).Routing.control({
-            waypoints: [userPos, targetPos],
-            router: osrmRouter,
-            addWaypoints: false,
-            draggableWaypoints: false,
-            fitSelectedRoutes: true,
-            show: false,
-            showAlternatives: true,
-            lineOptions: { styles: [{ color: '#2563eb', weight: 5, opacity: 0.9 }] },
-            altLineOptions: { styles: [{ color: '#9ca3af', weight: 4, opacity: 0.6, dashArray: '6,8' }] },
-            createMarker: () => null,
-          })
-          .on('routesfound', (e: any) => {
-            const route = e.routes?.[0];
-            if (!route) return;
-            const distKm = (route.summary.totalDistance / 1000).toFixed(2);
-            const etaMin = Math.round(route.summary.totalTime / 60);
-            const midIndex = Math.floor(route.coordinates.length / 2);
-            const mid = route.coordinates[midIndex];
+
+          const createOrUpdateHelpdeskRouting = () => {
+            if (helpdeskRoutingControlRef.current) {
+              helpdeskRoutingControlRef.current.setWaypoints([userPos, targetPos]);
+            } else {
+              const osrmRouter = (L as any).Routing?.OSRMv1 ? new (L as any).Routing.OSRMv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }) : undefined;
+              helpdeskRoutingControlRef.current = (L as any).Routing.control({
+                waypoints: [userPos, targetPos],
+                router: osrmRouter,
+                addWaypoints: false,
+                draggableWaypoints: false,
+                fitSelectedRoutes: true,
+                show: false,
+                showAlternatives: true,
+                lineOptions: { styles: [{ color: '#2563eb', weight: 5, opacity: 0.9 }] },
+                altLineOptions: { styles: [{ color: '#9ca3af', weight: 4, opacity: 0.6, dashArray: '6,8' }] },
+                createMarker: () => null,
+              })
+              .on('routesfound', (e: any) => {
+                const route = e.routes?.[0];
+                if (!route) return;
+                const distKm = (route.summary.totalDistance / 1000).toFixed(2);
+                const etaMin = Math.round(route.summary.totalTime / 60);
+                const midIndex = Math.floor(route.coordinates.length / 2);
+                const mid = route.coordinates[midIndex];
+                if (helpdeskPolylineRef.current && map.hasLayer(helpdeskPolylineRef.current)) {
+                  map.removeLayer(helpdeskPolylineRef.current);
+                }
+                if (!helpdeskRoutePopupRef.current) helpdeskRoutePopupRef.current = L.popup();
+                helpdeskRoutePopupRef.current
+                  .setLatLng([mid.lat, mid.lng])
+                  .setContent(`<div><strong>${distKm} km</strong> • ${etaMin} min</div>`)
+                  .openOn(map);
+              })
+              .on('routingerror', () => {
+                // OSRM failed, draw fallback polyline
+                drawHelpdeskFallbackRoute();
+              })
+              .addTo(map);
+            }
+            if (helpdeskPolylineRef.current && map.hasLayer(helpdeskPolylineRef.current)) {
+              map.removeLayer(helpdeskPolylineRef.current);
+            }
+          };
+
+          const drawHelpdeskFallbackRoute = () => {
+            if (helpdeskRoutingControlRef.current) {
+              map.removeControl(helpdeskRoutingControlRef.current);
+              helpdeskRoutingControlRef.current = null;
+            }
+            if (!helpdeskPolylineRef.current) {
+              helpdeskPolylineRef.current = L.polyline([userPos, targetPos], { color: '#2563eb', weight: 5, opacity: 0.9, renderer: L.canvas() }).addTo(map);
+            } else {
+              helpdeskPolylineRef.current.setLatLngs([userPos, targetPos]);
+              if (!map.hasLayer(helpdeskPolylineRef.current)) map.addLayer(helpdeskPolylineRef.current);
+            }
+            const distM = map.distance(userPos, targetPos);
+            const etaMin = Math.round((distM / 1.4) / 60);
+            const mid = L.latLng((userPos.lat + targetPos.lat) / 2, (userPos.lng + targetPos.lng) / 2);
             if (!helpdeskRoutePopupRef.current) helpdeskRoutePopupRef.current = L.popup();
             helpdeskRoutePopupRef.current
-              .setLatLng([mid.lat, mid.lng])
-              .setContent(`<div><strong>${distKm} km</strong> • ${etaMin} min</div>`)
+              .setLatLng(mid)
+              .setContent(`<div><strong>${(distM / 1000).toFixed(2)} km</strong> • ${etaMin} min</div>`)
               .openOn(map);
-          })
-          .addTo(map);
-          helpdeskRoutingControlRef.current = control;
+          };
+
+          drawHelpdeskFallbackRoute();
+          createOrUpdateHelpdeskRouting();
         });
       }
       const label = `Nearest Help Center: ${helpdeskTarget.name}`;
@@ -609,7 +689,7 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
       map.flyTo(latlng, Math.max(map.getZoom(), 19));
       // Auto-draw route immediately (live like member path)
       if (userLocation) {
-        // clear existing
+        // clear existing routing if any
         if (helpdeskRoutingControlRef.current) {
           map.removeControl(helpdeskRoutingControlRef.current);
           helpdeskRoutingControlRef.current = null;
@@ -618,8 +698,14 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
           map.closePopup(helpdeskRoutePopupRef.current);
           helpdeskRoutePopupRef.current = null;
         }
+        if (helpdeskPolylineRef.current) {
+          if (map.hasLayer(helpdeskPolylineRef.current)) map.removeLayer(helpdeskPolylineRef.current);
+          helpdeskPolylineRef.current = null;
+        }
+
         const userPos = L.latLng(userLocation.lat, userLocation.lng);
         const targetPos = L.latLng(latlng[0], latlng[1]);
+
         const osrmRouter = (L as any).Routing?.OSRMv1 ? new (L as any).Routing.OSRMv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }) : undefined;
         const control = (L as any).Routing.control({
           waypoints: [userPos, targetPos],
@@ -640,17 +726,41 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
           const etaMin = Math.round(route.summary.totalTime / 60);
           const midIndex = Math.floor(route.coordinates.length / 2);
           const mid = route.coordinates[midIndex];
+          if (helpdeskPolylineRef.current && map.hasLayer(helpdeskPolylineRef.current)) {
+            map.removeLayer(helpdeskPolylineRef.current);
+          }
           if (!helpdeskRoutePopupRef.current) helpdeskRoutePopupRef.current = L.popup();
           helpdeskRoutePopupRef.current
             .setLatLng([mid.lat, mid.lng])
             .setContent(`<div><strong>${distKm} km</strong> • ${etaMin} min</div>`)
             .openOn(map);
         })
+        .on('routingerror', () => {
+          // OSRM failed, draw fallback polyline
+          if (helpdeskRoutingControlRef.current) {
+            map.removeControl(helpdeskRoutingControlRef.current);
+            helpdeskRoutingControlRef.current = null;
+          }
+          const fallbackDistM = map.distance(userPos, targetPos);
+          const fallbackEtaMin = Math.round((fallbackDistM / 1.4) / 60);
+          const fallbackMid = L.latLng((userPos.lat + targetPos.lat) / 2, (userPos.lng + targetPos.lng) / 2);
+          if (!helpdeskPolylineRef.current) {
+            helpdeskPolylineRef.current = L.polyline([userPos, targetPos], { color: '#2563eb', weight: 5, opacity: 0.9, renderer: L.canvas() }).addTo(map);
+          } else {
+            helpdeskPolylineRef.current.setLatLngs([userPos, targetPos]);
+            if (!map.hasLayer(helpdeskPolylineRef.current)) map.addLayer(helpdeskPolylineRef.current);
+          }
+          if (!helpdeskRoutePopupRef.current) helpdeskRoutePopupRef.current = L.popup();
+          helpdeskRoutePopupRef.current
+            .setLatLng(fallbackMid)
+            .setContent(`<div><strong>${(fallbackDistM / 1000).toFixed(2)} km</strong> • ${fallbackEtaMin} min</div>`)
+            .openOn(map);
+        })
         .addTo(map);
         helpdeskRoutingControlRef.current = control;
       }
     } else {
-      // leaving helpdesk mode -> remove helpdesk marker
+      // leaving helpdesk mode -> remove helpdesk marker and any routes/popups
       if (helpdeskMarkerRef.current) {
         if (map.hasLayer(helpdeskMarkerRef.current)) map.removeLayer(helpdeskMarkerRef.current);
         helpdeskMarkerRef.current = null;
@@ -667,8 +777,25 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
         map.closePopup(helpdeskRoutePopupRef.current);
         helpdeskRoutePopupRef.current = null;
       }
+      // Also clear main routing controls when leaving helpdesk mode
+      if (osrmRoutingControlRef.current) {
+        map.removeControl(osrmRoutingControlRef.current);
+        osrmRoutingControlRef.current = null;
+      }
+      if (routePopupRef.current) {
+        map.closePopup(routePopupRef.current);
+        routePopupRef.current = null;
+      }
+      if (fallbackRouteLineRef.current) {
+        if (map.hasLayer(fallbackRouteLineRef.current)) map.removeLayer(fallbackRouteLineRef.current);
+        fallbackRouteLineRef.current = null;
+      }
+      if (fallbackRoutePopupRef.current) {
+        map.closePopup(fallbackRoutePopupRef.current);
+        fallbackRoutePopupRef.current = null;
+      }
     }
-  }, [mapMode, helpdeskTarget, userLocation, haversine]);
+  }, [mapMode, helpdeskTarget, userLocation, buildHelpdeskIcon]);
 
   // Live update the helpdesk route as user moves
   useEffect(() => {
