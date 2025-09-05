@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 // Group members are provided by GroupContext
 
 // Smooth animation helpers
-type LatLng = { lat: number; lng: number };
+type LatLng = { lat: number; lng: number; ts?: number };
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
@@ -49,6 +49,88 @@ function smoothMoveMarker(marker: L.Marker, to: LatLng, durationMs: number, anim
     animStateMap.set(marker, state as any);
   } catch {
     marker.setLatLng([to.lat, to.lng]);
+  }
+}
+
+// Smooth animation for a marker along a given path
+function smoothMoveMarkerAlongPath(
+  marker: L.Marker,
+  path: LatLng[],
+  animationState: React.MutableRefObject<Map<string, {
+    raf?: number;
+    currentPathIndex: number;
+    segmentStartTime: number;
+    segmentDuration: number;
+    pathId: string;
+  }>>,
+  memberId: string,
+  haversine: (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => number,
+) {
+  if (!path || path.length < 2) {
+    return;
+  }
+
+  const WALK_SPEED_MPS = 5 * 1000 / 3600; // ~5 km/h in meters per second
+
+  const state = animationState.current.get(memberId) || {
+    currentPathIndex: 0,
+    segmentStartTime: 0,
+    segmentDuration: 0,
+    pathId: ''
+  };
+  animationState.current.set(memberId, state);
+
+  const startAnimation = (currentIndex: number) => {
+    if (state.raf) cancelAnimationFrame(state.raf);
+
+    const from = path[currentIndex];
+    const to = path[currentIndex + 1];
+
+    if (!from || !to) {
+      animationState.current.delete(memberId);
+      return;
+    }
+
+    const segmentDistance = haversine(from, to);
+    state.segmentDuration = (segmentDistance / WALK_SPEED_MPS) * 1000; // ms
+    state.segmentStartTime = performance.now();
+    state.currentPathIndex = currentIndex;
+
+    const step = (now: number) => {
+      const elapsed = now - state.segmentStartTime;
+      const t = Math.min(1, elapsed / state.segmentDuration);
+      const eased = easeInOutQuad(t);
+
+      const lat = lerp(from.lat, to.lat, eased);
+      const lng = lerp(from.lng, to.lng, eased);
+      marker.setLatLng([lat, lng]);
+
+      if (t < 1) {
+        state.raf = requestAnimationFrame(step);
+      } else {
+        // Move to the next segment
+        if (currentIndex + 2 < path.length) {
+          startAnimation(currentIndex + 1);
+        } else {
+          animationState.current.delete(memberId); // Animation complete
+        }
+      }
+    };
+    state.raf = requestAnimationFrame(step);
+  };
+
+  // Check if path has changed or if marker is at the end of the old path
+  const currentPathString = JSON.stringify(path.map(p => `${p.lat},${p.lng}`));
+  if (state.pathId !== currentPathString) {
+    state.pathId = currentPathString;
+    state.currentPathIndex = 0;
+    startAnimation(0);
+  } else if (state.currentPathIndex + 1 < path.length) {
+    // Continue animation if still on the same path and not at the end
+    startAnimation(state.currentPathIndex);
+  } else if (path.length > 0) {
+    // If at the end of the previous path, but new path has more points
+    startAnimation(path.length - 2 >= 0 ? path.length - 2 : 0);
   }
 }
 
@@ -87,6 +169,15 @@ const MapScreen: React.FC = () => {
   const osrmRoutingControlRef = useRef<any>(null);
   const fallbackRouteLineRef = useRef<L.Polyline | null>(null);
   const fallbackRoutePopupRef = useRef<L.Popup | null>(null);
+
+  // New ref for member path animations
+  const memberPathAnimStateRef = useRef<Map<string, {
+    raf?: number;
+    currentPathIndex: number;
+    segmentStartTime: number;
+    segmentDuration: number;
+    pathId: string; // To detect if the path itself has changed
+  }>>(new Map());
 
   // Static help centers
   const helpCenters = useMemo(() => ([
@@ -355,6 +446,7 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
               const midIndex = Math.floor(route.coordinates.length / 2);
               const mid = route.coordinates[midIndex];
 
+              // Remove fallback elements if OSRM route is found
               if (fallbackRouteLineRef.current && map.hasLayer(fallbackRouteLineRef.current)) {
                 map.removeLayer(fallbackRouteLineRef.current);
               }
@@ -372,15 +464,16 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
                 .openOn(map);
             })
             .on('routingerror', () => {
-              // OSRM failed, switch to fallback polyline
+              // OSRM failed, ensure fallback polyline is shown
               if (osrmRoutingControlRef.current && map.hasLayer(osrmRoutingControlRef.current)) {
                 map.removeControl(osrmRoutingControlRef.current);
                 osrmRoutingControlRef.current = null;
               }
-              drawFallbackRoute();
+              drawFallbackRoute(); // Make sure fallback is active
             })
             .addTo(map);
         }
+        // Ensure fallback elements are removed if OSRM control is active or successfully created
         if (fallbackRouteLineRef.current && map.hasLayer(fallbackRouteLineRef.current)) {
           map.removeLayer(fallbackRouteLineRef.current);
         }
@@ -391,7 +484,8 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
       };
 
       const drawFallbackRoute = () => {
-        if (osrmRoutingControlRef.current) {
+        // Ensure OSRM control and its popup are removed if fallback is drawn
+        if (osrmRoutingControlRef.current && map.hasLayer(osrmRoutingControlRef.current)) {
           map.removeControl(osrmRoutingControlRef.current);
           osrmRoutingControlRef.current = null;
         }
@@ -451,16 +545,27 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
       const isSelected = !!(selectedMember && selectedMember.id === m.id);
       const icon = buildDirectionalIcon('#16a34a', m.headingDeg, isSelected);
       const existing = cache.get(m.id);
+
+      const memberPath = m.path && Array.isArray(m.path) && m.path.length > 1 ? m.path : null;
+
       if (existing) {
-        // Slightly longer animation duration for gentler, slower perceived motion
-        smoothMoveMarker(existing, m.position, 600, memberAnimRefs.current);
+        // Smoothly move marker along path if available, otherwise just update position
+        if (memberPath) {
+          smoothMoveMarkerAlongPath(existing, memberPath, memberPathAnimStateRef, m.id, haversine);
+        } else {
+          smoothMoveMarker(existing, m.position, 600, memberAnimRefs.current);
+        }
         existing.setIcon(icon);
       } else {
-        const newMarker = L.marker([m.position.lat, m.position.lng], { icon })
+        const initialPosition = memberPath && memberPath.length > 0 ? memberPath[0] : m.position;
+        const newMarker = L.marker([initialPosition.lat, initialPosition.lng], { icon })
           .addTo(map)
           .bindTooltip(m.name, { permanent: true, direction: 'top', offset: L.point(0, -10) });
         newMarker.on('click', () => setSelectedMember(m));
         cache.set(m.id, newMarker);
+        if (memberPath) {
+          smoothMoveMarkerAlongPath(newMarker, memberPath, memberPathAnimStateRef, m.id, haversine);
+        }
       }
     });
     // cleanup missing
@@ -468,9 +573,15 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
       if (!presentIds.has(id)) {
         map.removeLayer(marker);
         cache.delete(id);
+        // Clean up animation state for removed members
+        if (memberPathAnimStateRef.current.has(id)) {
+          const animState = memberPathAnimStateRef.current.get(id);
+          if (animState && animState.raf) cancelAnimationFrame(animState.raf);
+          memberPathAnimStateRef.current.delete(id);
+        }
       }
     }
-  }, [members, buildDirectionalIcon, mapMode]);
+  }, [members, buildDirectionalIcon, mapMode, haversine]);
 
   // Clear selected member by clicking on the map background
   useEffect(() => {
@@ -498,7 +609,7 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
       selectedMemberRef.current = selected;
     } else {
       // No active selection -> remove routing and popup if exists
-      if (osrmRoutingControlRef.current) {
+      if (osrmRoutingControlRef.current && map.hasLayer(osrmRoutingControlRef.current)) {
         map.removeControl(osrmRoutingControlRef.current);
         osrmRoutingControlRef.current = null;
       }
@@ -506,8 +617,8 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
         map.closePopup(routePopupRef.current);
         routePopupRef.current = null;
       }
-      if (fallbackRouteLineRef.current) {
-        if (map.hasLayer(fallbackRouteLineRef.current)) map.removeLayer(fallbackRouteLineRef.current);
+      if (fallbackRouteLineRef.current && map.hasLayer(fallbackRouteLineRef.current)) {
+        map.removeLayer(fallbackRouteLineRef.current);
         fallbackRouteLineRef.current = null;
       }
       if (fallbackRoutePopupRef.current) {
@@ -594,16 +705,16 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
             toast.error('Location not available');
             return;
           }
-          // clear any existing straight polyline or routing control
-          if (fallbackRouteLineRef.current) {
-            if (map.hasLayer(fallbackRouteLineRef.current)) map.removeLayer(fallbackRouteLineRef.current);
+          // clear any existing main routing elements when clicking on helpdesk marker
+          if (fallbackRouteLineRef.current && map.hasLayer(fallbackRouteLineRef.current)) {
+            map.removeLayer(fallbackRouteLineRef.current);
             fallbackRouteLineRef.current = null;
           }
           if (fallbackRoutePopupRef.current) {
             map.closePopup(fallbackRoutePopupRef.current);
             fallbackRoutePopupRef.current = null;
           }
-          if (osrmRoutingControlRef.current) {
+          if (osrmRoutingControlRef.current && map.hasLayer(osrmRoutingControlRef.current)) {
             map.removeControl(osrmRoutingControlRef.current);
             osrmRoutingControlRef.current = null;
           }
@@ -654,13 +765,19 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
               })
               .addTo(map);
             }
+            // Ensure fallback helpdesk polyline is removed if OSRM control is active or successfully created
             if (helpdeskPolylineRef.current && map.hasLayer(helpdeskPolylineRef.current)) {
               map.removeLayer(helpdeskPolylineRef.current);
+            }
+            if (helpdeskRoutePopupRef.current) {
+              map.closePopup(helpdeskRoutePopupRef.current);
+              helpdeskRoutePopupRef.current = null;
             }
           };
 
           const drawHelpdeskFallbackRoute = () => {
-            if (helpdeskRoutingControlRef.current) {
+            // Ensure helpdesk OSRM control and its popup are removed if fallback is drawn
+            if (helpdeskRoutingControlRef.current && map.hasLayer(helpdeskRoutingControlRef.current)) {
               map.removeControl(helpdeskRoutingControlRef.current);
               helpdeskRoutingControlRef.current = null;
             }
@@ -680,8 +797,8 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
               .openOn(map);
           };
 
-          drawHelpdeskFallbackRoute();
-          createOrUpdateHelpdeskRouting();
+          drawHelpdeskFallbackRoute(); // Always show fallback immediately
+          createOrUpdateHelpdeskRouting(); // Then try to get OSRM route
         });
       }
       const label = `Nearest Help Center: ${helpdeskTarget.name}`;
@@ -689,8 +806,26 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
       map.flyTo(latlng, Math.max(map.getZoom(), 19));
       // Auto-draw route immediately (live like member path)
       if (userLocation) {
-        // clear existing routing if any
-        if (helpdeskRoutingControlRef.current) {
+        // clear existing main routing if any
+        if (osrmRoutingControlRef.current && map.hasLayer(osrmRoutingControlRef.current)) {
+          map.removeControl(osrmRoutingControlRef.current);
+          osrmRoutingControlRef.current = null;
+        }
+        if (routePopupRef.current) {
+          map.closePopup(routePopupRef.current);
+          routePopupRef.current = null;
+        }
+        if (fallbackRouteLineRef.current && map.hasLayer(fallbackRouteLineRef.current)) {
+          map.removeLayer(fallbackRouteLineRef.current);
+          fallbackRouteLineRef.current = null;
+        }
+        if (fallbackRoutePopupRef.current) {
+          map.closePopup(fallbackRoutePopupRef.current);
+          fallbackRoutePopupRef.current = null;
+        }
+
+        // clear existing helpdesk routing if any to re-draw
+        if (helpdeskRoutingControlRef.current && map.hasLayer(helpdeskRoutingControlRef.current)) {
           map.removeControl(helpdeskRoutingControlRef.current);
           helpdeskRoutingControlRef.current = null;
         }
@@ -698,8 +833,8 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
           map.closePopup(helpdeskRoutePopupRef.current);
           helpdeskRoutePopupRef.current = null;
         }
-        if (helpdeskPolylineRef.current) {
-          if (map.hasLayer(helpdeskPolylineRef.current)) map.removeLayer(helpdeskPolylineRef.current);
+        if (helpdeskPolylineRef.current && map.hasLayer(helpdeskPolylineRef.current)) {
+          map.removeLayer(helpdeskPolylineRef.current);
           helpdeskPolylineRef.current = null;
         }
 
@@ -737,7 +872,7 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
         })
         .on('routingerror', () => {
           // OSRM failed, draw fallback polyline
-          if (helpdeskRoutingControlRef.current) {
+          if (helpdeskRoutingControlRef.current && map.hasLayer(helpdeskRoutingControlRef.current)) {
             map.removeControl(helpdeskRoutingControlRef.current);
             helpdeskRoutingControlRef.current = null;
           }
@@ -761,15 +896,15 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
       }
     } else {
       // leaving helpdesk mode -> remove helpdesk marker and any routes/popups
-      if (helpdeskMarkerRef.current) {
-        if (map.hasLayer(helpdeskMarkerRef.current)) map.removeLayer(helpdeskMarkerRef.current);
+      if (helpdeskMarkerRef.current && map.hasLayer(helpdeskMarkerRef.current)) {
+        map.removeLayer(helpdeskMarkerRef.current);
         helpdeskMarkerRef.current = null;
       }
-      if (helpdeskPolylineRef.current) {
-        if (map.hasLayer(helpdeskPolylineRef.current)) map.removeLayer(helpdeskPolylineRef.current);
+      if (helpdeskPolylineRef.current && map.hasLayer(helpdeskPolylineRef.current)) {
+        map.removeLayer(helpdeskPolylineRef.current);
         helpdeskPolylineRef.current = null;
       }
-      if (helpdeskRoutingControlRef.current) {
+      if (helpdeskRoutingControlRef.current && map.hasLayer(helpdeskRoutingControlRef.current)) {
         map.removeControl(helpdeskRoutingControlRef.current);
         helpdeskRoutingControlRef.current = null;
       }
@@ -778,7 +913,7 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
         helpdeskRoutePopupRef.current = null;
       }
       // Also clear main routing controls when leaving helpdesk mode
-      if (osrmRoutingControlRef.current) {
+      if (osrmRoutingControlRef.current && map.hasLayer(osrmRoutingControlRef.current)) {
         map.removeControl(osrmRoutingControlRef.current);
         osrmRoutingControlRef.current = null;
       }
@@ -786,8 +921,8 @@ const DEFAULT_ZOOM = 16; // default zoom at initialization
         map.closePopup(routePopupRef.current);
         routePopupRef.current = null;
       }
-      if (fallbackRouteLineRef.current) {
-        if (map.hasLayer(fallbackRouteLineRef.current)) map.removeLayer(fallbackRouteLineRef.current);
+      if (fallbackRouteLineRef.current && map.hasLayer(fallbackRouteLineRef.current)) {
+        map.removeLayer(fallbackRouteLineRef.current);
         fallbackRouteLineRef.current = null;
       }
       if (fallbackRoutePopupRef.current) {
