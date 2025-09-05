@@ -189,7 +189,7 @@ export const GroupMapView: React.FC<GroupMapViewProps> = ({ expanded = false }) 
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-3 overflow-auto max-h-64">
+        <CardContent className="space-y-3 overflow-y-scroll h-[15.5rem]">
           {filteredGroups.map((group, index) => (
             <motion.div
               key={group.id}

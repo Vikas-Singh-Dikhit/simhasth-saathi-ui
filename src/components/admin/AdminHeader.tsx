@@ -10,9 +10,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Bell, User, LogOut, Settings, Globe, Wifi, WifiOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { LanguageSelector } from '@/components/ui/language-selector';
 import { useTranslation } from '@/context/TranslationContext';
 import { toast } from 'sonner';
+import { motion } from 'framer-motion';
 
 export const AdminHeader: React.FC = () => {
   const navigate = useNavigate();
@@ -56,10 +56,10 @@ export const AdminHeader: React.FC = () => {
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'admin': return 'bg-red-500';
-      case 'volunteer': return 'bg-blue-500';
-      case 'police': return 'bg-green-500';
-      default: return 'bg-gray-500';
+      case 'admin': return 'bg-gradient-to-r from-red-500 to-red-400';
+      case 'volunteer': return 'bg-gradient-to-r from-blue-500 to-blue-400';
+      case 'police': return 'bg-gradient-to-r from-green-500 to-green-400';
+      default: return 'bg-gradient-to-r from-gray-500 to-gray-400';
     }
   };
 
@@ -100,7 +100,7 @@ export const AdminHeader: React.FC = () => {
                 <Globe className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent>
+            <DropdownMenuContent modal={false} className="bg-card shadow-md rounded-md max-h-60 overflow-y-auto z-50">
               <DropdownMenuItem onClick={() => setLanguage('en')}>
                 English
               </DropdownMenuItem>
@@ -137,7 +137,7 @@ export const AdminHeader: React.FC = () => {
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent modal={false} className="bg-card shadow-md rounded-md max-h-60 overflow-y-auto z-50">
               <DropdownMenuItem>
                 <Settings className="h-4 w-4 mr-2" />
                 Settings

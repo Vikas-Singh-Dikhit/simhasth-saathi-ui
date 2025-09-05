@@ -1,12 +1,13 @@
 import React, { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Outlet } from 'react-router-dom';
 import { IonicHeader } from './ionic-header';
 import { IonicContent } from './ionic-content';
 import { BottomNavigation } from '@/components/ui/bottom-navigation';
 import { useTranslation } from '@/context/TranslationContext';
 
 interface IonicLayoutProps {
-  children: React.ReactNode;
+  // children optional, kyunki Outlet use karenge
+  children?: React.ReactNode;
 }
 
 interface RouteConfig {
@@ -23,7 +24,6 @@ export const IonicLayout: React.FC<IonicLayoutProps> = ({ children }) => {
   const location = useLocation();
   const { t } = useTranslation();
 
-  // Configuration for each route
   const routeConfig: Record<string, RouteConfig> = {
     '/dashboard': {
       title: t('welcomeTitle') || 'Simhasth Saathi',
@@ -36,7 +36,6 @@ export const IonicLayout: React.FC<IonicLayoutProps> = ({ children }) => {
     },
     '/map': {
       title: t('groupStatus') || 'Group Status',
-      subtitle: undefined,
       leftIcon: 'back',
       rightIcon: 'notifications',
       showHeader: false,
@@ -92,41 +91,42 @@ export const IonicLayout: React.FC<IonicLayoutProps> = ({ children }) => {
   };
 
   const handleLeftClick = () => {
-    // Handle back navigation or menu toggle
     if (currentRoute.leftIcon === 'back') {
       window.history.back();
     }
   };
 
   const handleRightClick = () => {
-    // Handle notifications or profile actions
     if (currentRoute.rightIcon === 'notifications') {
-      // Navigate to notifications or open notifications panel
       console.log('Open notifications');
     }
   };
-  useEffect(()=>{
-    console.info(location,"current ")
-    console.info(location.pathname != "/map","fdghhdf ")
-  })
+
+  useEffect(() => {
+    console.info(location, "current");
+  }, [location]);
+
   return (
     <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
       {/* Fixed Header */}
       {currentRoute.showHeader && (
-      <IonicHeader
-        title={currentRoute.title || 'Simhasth Saathi'}
-        subtitle={currentRoute.subtitle}
-        leftIcon={currentRoute.leftIcon}
-        rightIcon={currentRoute.rightIcon}
-        onLeftClick={handleLeftClick}
-        onRightClick={handleRightClick}
-        showNotificationBadge={currentRoute.showNotificationBadge}
-      />
-    )}
+        <IonicHeader
+          title={currentRoute.title || 'Simhasth Saathi'}
+          subtitle={currentRoute.subtitle}
+          leftIcon={currentRoute.leftIcon}
+          rightIcon={currentRoute.rightIcon}
+          onLeftClick={handleLeftClick}
+          onRightClick={handleRightClick}
+          showNotificationBadge={currentRoute.showNotificationBadge}
+        />
+      )}
 
       {/* Scrollable Content Area */}
       <IonicContent className={`${!currentRoute.showHeader ? 'pt-0' : ''} ${!currentRoute.showBottomNav ? 'pb-0' : 'pb-nav'}`}>
+        {/* Agar children diye hain */}
         {children}
+        {/* Ya nested routes ke liye */}
+        <Outlet />
       </IonicContent>
 
       {/* Fixed Bottom Navigation */}

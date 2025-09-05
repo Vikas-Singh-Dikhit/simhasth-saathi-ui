@@ -22,7 +22,6 @@ import { IonicLayout } from "./components/layout/ionic-layout";
 import { TranslationProvider } from './context/TranslationContext';
 import { GroupProvider } from './context/GroupContext';
 
-
 const queryClient = new QueryClient();
 
 /* ✅ Route Guard Component */
@@ -38,52 +37,50 @@ const AdminProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return isAdminAuthenticated ? <>{children}</> : <Navigate to="/admin/login" replace />;
 };
 
-/* App Wrapper with Ionic Layout */
-const AppWrapper = () => {
-  return (
-    <IonicLayout>
-      <Routes>
-        {/* Public route */}
-        <Route path="/" element={<Index />} />
-
-        {/* Protected routes */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard groupCode="GRP-2024-001" />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/map" element={<ProtectedRoute><MapScreen /></ProtectedRoute>} />
-        <Route path="/sos" element={<ProtectedRoute><SOSScreen /></ProtectedRoute>} />
-        <Route path="/helpdesk" element={<ProtectedRoute><HelpdeskScreen /></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><ProfileScreen /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><SettingsScreen /></ProtectedRoute>} />
-        <Route path="/notifications" element={<ProtectedRoute><NotificationsScreen /></ProtectedRoute>} />
-
-        {/* Admin Routes */}
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin/dashboard" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
-
-        {/* Fallback */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </IonicLayout>
-  );
-};
-
-/* Main App with providers */
+/* ✅ Main App */
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <TranslationProvider>
         <GroupProvider>
           <BrowserRouter>
-            <AppWrapper />
+            <Routes>
+              {/* 🔹 User Routes with Ionic Layout */}
+              <Route element={<IonicLayout />}>
+                <Route path="/" element={<Index />} />
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ProtectedRoute>
+                      <Dashboard groupCode="GRP-2024-001" />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="/map" element={<ProtectedRoute><MapScreen /></ProtectedRoute>} />
+                <Route path="/sos" element={<ProtectedRoute><SOSScreen /></ProtectedRoute>} />
+                <Route path="/helpdesk" element={<ProtectedRoute><HelpdeskScreen /></ProtectedRoute>} />
+                <Route path="/profile" element={<ProtectedRoute><ProfileScreen /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><SettingsScreen /></ProtectedRoute>} />
+                <Route path="/notifications" element={<ProtectedRoute><NotificationsScreen /></ProtectedRoute>} />
+              </Route>
+
+              {/* 🔹 Admin Routes without Ionic Layout */}
+              <Route path="/admin/login" element={<AdminLogin />} />
+              <Route
+                path="/admin/dashboard"
+                element={
+                  <AdminProtectedRoute>
+                    <AdminDashboard />
+                  </AdminProtectedRoute>
+                }
+              />
+
+              {/* 🔹 Fallback */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
           </BrowserRouter>
+          <Toaster />
         </GroupProvider>
-        <Toaster />
       </TranslationProvider>
     </TooltipProvider>
   </QueryClientProvider>

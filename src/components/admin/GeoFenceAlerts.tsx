@@ -157,7 +157,7 @@ export const GeoFenceAlerts: React.FC<GeoFenceAlertsProps> = ({ expanded = false
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-3 overflow-auto">
+      <CardContent className="space-y-3 overflow-auto overflow-y-scroll h-72">
         <AnimatePresence>
           {alerts.slice(0, expanded ? alerts.length : 4).map((alert, index) => {
             const TypeIcon = getTypeIcon(alert.type);
